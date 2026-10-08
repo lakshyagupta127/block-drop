@@ -7,11 +7,17 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DB_FILE
-        value: /data/tetris.db
       - key: PORT
         value: 3000
-    disk:
-      name: blockdrop-db
-      mountPath: /data
-      sizeGB: 1
+      - key: DATABASE_URL
+        fromDatabase:
+          name: block-drop-db
+          property: connectionString
+      # Set these manually in Render dashboard (keep secret):
+      # JWT_SECRET, SCORE_SECRET, ADMIN_PASSWORD
+
+databases:
+  - name: block-drop-db
+    plan: free
+    databaseName: blockdrop
+    user: blockdrop
