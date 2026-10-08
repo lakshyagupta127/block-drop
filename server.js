@@ -196,6 +196,17 @@ app.get(['.env'], (_req, res) => res.status(403).end());
   app.get(`/${page}.html`, (_req, res) => res.sendFile(path.join(__dirname, `${page}.html`)));
 });
 
+// ── PWA / TWA files ──────────────────────────────
+app.get('/manifest.json', (_req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json');
+  res.sendFile(path.join(__dirname, 'manifest.json'));
+});
+
+app.get('/.well-known/assetlinks.json', (_req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.sendFile(path.join(__dirname, '.well-known', 'assetlinks.json'));
+});
+
 // ══════════════════════════════════════════════════
 //  AUTH
 // ══════════════════════════════════════════════════
