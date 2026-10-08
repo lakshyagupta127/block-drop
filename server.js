@@ -23,6 +23,12 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'dev_admin_password';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 const DB_FILE        = process.env.DB_FILE        || path.join(__dirname, 'tetris.db');
 
+// Ensure the DB directory exists (important on Render before disk is attached)
+const dbDir = path.dirname(DB_FILE);
+if (!fs.existsSync(dbDir)) {
+  try { fs.mkdirSync(dbDir, { recursive: true }); } catch(_) {}
+}
+
 // Fail fast in production if real secrets are not provided
 if (process.env.NODE_ENV === 'production') {
   const missing = ['JWT_SECRET','SCORE_SECRET','ADMIN_PASSWORD'].filter(k => !process.env[k]);
