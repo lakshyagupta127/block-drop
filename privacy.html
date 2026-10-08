@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Block Drop</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#0d0d1a;color:#ccc;font-family:'Courier New',monospace;line-height:1.8;padding:0 0 60px}
+    .header{background:#1a1a2e;border-bottom:1px solid #333;padding:20px 32px;display:flex;align-items:center;gap:16px}
+    .header a{color:#00f0f0;text-decoration:none;font-size:13px}
+    .header h1{font-size:20px;color:#fff;letter-spacing:3px}
+    .container{max-width:800px;margin:0 auto;padding:40px 24px}
+    h2{color:#00f0f0;font-size:16px;letter-spacing:2px;text-transform:uppercase;margin:36px 0 12px;border-bottom:1px solid #1a1a2e;padding-bottom:8px}
+    h3{color:#aac;font-size:14px;margin:20px 0 8px}
+    p{margin-bottom:12px;font-size:14px}
+    ul{margin:8px 0 16px 20px;font-size:14px}
+    ul li{margin-bottom:6px}
+    .badge{display:inline-block;background:#1a1a2e;border:1px solid #333;border-radius:6px;padding:4px 12px;font-size:12px;color:#888;margin:4px 4px 4px 0}
+    .updated{color:#555;font-size:12px;margin-bottom:32px}
+    .highlight{background:#1a1a2e;border-left:3px solid #00f0f0;padding:12px 16px;border-radius:0 6px 6px 0;margin:16px 0;font-size:13px}
+    a{color:#00f0f0}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0}
+    th{background:#1a1a2e;color:#888;padding:8px 12px;text-align:left;border:1px solid #222}
+    td{padding:8px 12px;border:1px solid #1a1a2e;vertical-align:top}
+  </style>
+</head>
+<body>
+<div class="header">
+  <a href="/">← Back to Game</a>
+  <h1>BLOCK DROP</h1>
+</div>
+<div class="container">
+  <h1 style="color:#fff;font-size:24px;letter-spacing:4px;margin-bottom:8px">Privacy Policy</h1>
+  <p class="updated">Last updated: October 7, 2026 &nbsp;·&nbsp; Effective: October 7, 2026</p>
+
+  <div class="highlight">
+    This Privacy Policy explains what data Block Drop collects, why, how it is stored, and your rights over it. By playing Block Drop, you agree to the practices described here.
+  </div>
+
+  <h2>1. Who We Are</h2>
+  <p>Block Drop is a browser-based puzzle game. For questions about this policy, contact us at: <strong>[YOUR EMAIL ADDRESS]</strong></p>
+
+  <h2>2. Data We Collect</h2>
+  <table>
+    <tr><th>Data</th><th>Why Collected</th><th>Stored Where</th><th>How Long</th></tr>
+    <tr><td>Display name (chosen by you)</td><td>Leaderboard display</td><td>Our server (SQLite DB)</td><td>Until you delete it</td></tr>
+    <tr><td>Game scores, level, lines cleared</td><td>Leaderboard rankings</td><td>Our server</td><td>Until you delete it</td></tr>
+    <tr><td>Session duration</td><td>Game analytics</td><td>Our server</td><td>Until you delete it</td></tr>
+    <tr><td>Device type (mobile/desktop/tablet)</td><td>UI optimisation</td><td>Our server</td><td>Until you delete it</td></tr>
+    <tr><td>Browser fingerprint (SHA-256 hash)</td><td>Player identity across sessions — no login required</td><td>Our server + your browser (localStorage)</td><td>Until you delete it</td></tr>
+    <tr><td>Sound/music volume preferences</td><td>Personalisation</td><td>Your browser (localStorage only)</td><td>Until you clear browser data</td></tr>
+    <tr><td>IP address</td><td>Security (rate limiting, abuse prevention)</td><td>Server memory only — not persisted to DB</td><td>Not stored persistently</td></tr>
+    <tr><td>Age confirmation (13+)</td><td>COPPA compliance</td><td>Your browser (localStorage only)</td><td>Until you clear browser data</td></tr>
+  </table>
+
+  <h2>3. Browser Fingerprinting</h2>
+  <p>Block Drop uses a privacy-preserving browser fingerprint to identify you across sessions without requiring a login or email address. This fingerprint is a SHA-256 cryptographic hash generated from:</p>
+  <ul>
+    <li>Your browser's user agent string</li>
+    <li>Your browser language setting</li>
+    <li>Your screen resolution and colour depth</li>
+    <li>Your timezone offset</li>
+    <li>Your CPU core count (hardware concurrency)</li>
+    <li>Your platform string (e.g. "Win32")</li>
+  </ul>
+  <p>The raw values are never sent to our server — only the hashed result. This hash cannot be reversed to identify you personally. It is used solely to associate your display name with your game sessions.</p>
+  <p><strong>You can reset your identity at any time</strong> by clearing your browser's localStorage or using the "Delete My Data" option in Settings.</p>
+
+  <h2>4. Children's Privacy (COPPA)</h2>
+  <p>Block Drop requires users to confirm they are aged <strong>13 or older</strong> before playing. We do not knowingly collect personal data from children under 13. If you are a parent or guardian and believe your child has provided data to us, please contact us at <strong>[YOUR EMAIL]</strong> and we will delete it promptly.</p>
+  <p>For users in the European Union, the minimum age is <strong>16</strong> unless local law permits a lower age (minimum 13). For users in Brazil, parental consent is required for users under 18 for certain features.</p>
+
+  <h2>5. How We Use Your Data</h2>
+  <ul>
+    <li>To display your name and score on the leaderboard</li>
+    <li>To associate your display name with your browser session (fingerprint)</li>
+    <li>To prevent cheating via score validation</li>
+    <li>To prevent abuse via rate limiting</li>
+    <li>To improve the game based on aggregate, anonymised usage patterns</li>
+  </ul>
+  <p>We do <strong>not</strong>:</p>
+  <ul>
+    <li>Sell your data to third parties</li>
+    <li>Use your data for advertising</li>
+    <li>Share your data with any third party except as required by law</li>
+    <li>Store payment information (there are no in-app purchases)</li>
+    <li>Collect your real name, email, phone number, or physical address</li>
+  </ul>
+
+  <h2>6. Data Storage &amp; Security</h2>
+  <p>Your data is stored in a SQLite database on our server. We protect it using:</p>
+  <ul>
+    <li>HTTPS encryption for all data in transit</li>
+    <li>HMAC cryptographic signing to prevent score tampering</li>
+    <li>JWT-secured admin access</li>
+    <li>Rate limiting to prevent abuse</li>
+    <li>Helmet.js security headers</li>
+  </ul>
+
+  <h2>7. Your Rights</h2>
+  <p>Depending on your location, you may have the following rights:</p>
+  <table>
+    <tr><th>Right</th><th>How to exercise it</th><th>Applies in</th></tr>
+    <tr><td>Access your data</td><td>Contact us at [YOUR EMAIL]</td><td>EU, UK, India, Brazil</td></tr>
+    <tr><td>Delete your data</td><td>Settings → Delete My Data (in-app) or email us</td><td>EU, UK, USA (COPPA), India, Brazil</td></tr>
+    <tr><td>Correct your data</td><td>Settings → Change Name</td><td>EU, UK, India</td></tr>
+    <tr><td>Withdraw consent</td><td>Settings → Delete My Data</td><td>EU, UK</td></tr>
+    <tr><td>Data portability</td><td>Email us</td><td>EU, UK</td></tr>
+    <tr><td>Object to processing</td><td>Email us</td><td>EU, UK</td></tr>
+  </table>
+
+  <h2>8. Cookies &amp; Local Storage</h2>
+  <p>Block Drop does not use tracking cookies. We use browser <strong>localStorage</strong> to store:</p>
+  <ul>
+    <li>Your browser fingerprint hash (player identity)</li>
+    <li>Your age confirmation status</li>
+    <li>Your sound/music volume preferences</li>
+  </ul>
+  <p>This data never leaves your device unless explicitly submitted (e.g. when you set a display name or submit a score).</p>
+
+  <h2>9. International Data Transfers</h2>
+  <p>If you are located outside the country where our server is hosted, your data may be transferred internationally. We ensure appropriate safeguards are in place in accordance with applicable law.</p>
+
+  <h2>10. Legal Bases for Processing (GDPR)</h2>
+  <p>For users in the European Union, our legal bases for processing personal data are:</p>
+  <ul>
+    <li><strong>Consent</strong> — for fingerprinting and display name storage (you can withdraw at any time)</li>
+    <li><strong>Legitimate interests</strong> — for security, rate limiting, and abuse prevention</li>
+  </ul>
+
+  <h2>11. Changes to This Policy</h2>
+  <p>We may update this Privacy Policy from time to time. We will notify you by updating the "Last updated" date at the top of this page. Continued use of Block Drop after changes constitutes acceptance of the updated policy.</p>
+
+  <h2>12. Contact</h2>
+  <p>For any privacy-related questions or requests:</p>
+  <ul>
+    <li>Email: <strong>[YOUR EMAIL ADDRESS]</strong></li>
+    <li>Response time: within 30 days</li>
+  </ul>
+
+  <div style="margin-top:40px;padding-top:20px;border-top:1px solid #1a1a2e;display:flex;gap:16px;flex-wrap:wrap">
+    <a href="/">← Back to Game</a>
+    <a href="/terms.html">Terms of Service</a>
+    <a href="/data-safety.html">Data Safety</a>
+  </div>
+</div>
+</body>
+</html>

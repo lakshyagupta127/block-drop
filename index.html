@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0d0d1a">
+  <meta name="rating" content="general">
+  <meta property="og:title" content="Block Drop">
+  <meta property="og:description" content="A free puzzle game. Rated Everyone / PEGI 3. No ads, no in-app purchases.">
+  <meta name="google-play-app" content="app-id=com.yourname.blockdrop">
+  <title>Block Drop</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── Language Picker Modal (shown on very first launch) ── -->
+  <div id="langPickerModal" class="modal-overlay lang-overlay" style="display:none">
+    <div class="lang-modal">
+      <div class="lang-modal-header">
+        <div class="lang-logo">🎮</div>
+        <h1 class="lang-title">BLOCK DROP</h1>
+        <p class="lang-subtitle" id="langSubtitle">Choose your language / अपनी भाषा चुनें / Elige tu idioma</p>
+      </div>
+
+      <div class="lang-grid-wrap">
+        <div class="lang-grid" id="langGrid">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="lang-confirm-wrap">
+        <button class="retro-btn lang-confirm-btn" id="langConfirmBtn" disabled>Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Top bar (mobile) ── -->
+  <div class="top-bar">
+    <div class="stat-pill"><span class="stat-label" data-i18n="score">SCORE</span><span class="stat-val" id="scoreDisplay">0</span></div>
+    <div class="stat-pill"><span class="stat-label" data-i18n="level">LEVEL</span><span class="stat-val" id="levelDisplay">1</span></div>
+    <div class="stat-pill"><span class="stat-label" data-i18n="lines">LINES</span><span class="stat-val" id="linesDisplay">0</span></div>
+    <div class="stat-pill speed-pill"><span class="stat-label" data-i18n="speed">SPEED</span><span class="stat-val speed-val" id="speedDisplayMob">0%</span></div>
+    <button class="icon-btn" id="leaderboardBtn"  title="Leaderboard">🏆</button>
+    <button class="icon-btn" id="helpBtn"         title="How to Play">❓</button>
+    <button class="icon-btn" id="settingsBtnMob"  title="Settings">⚙️</button>
+    <button class="icon-btn" id="pauseBtn"         title="Pause">⏸</button>
+  </div>
+
+  <!-- ── Main layout ── -->
+  <div class="game-wrapper">
+
+    <!-- Left panel (desktop) -->
+    <div class="left-panel desktop-only">
+      <div class="panel-box">
+        <h3 data-i18n="score">Score</h3>
+        <div class="value" id="scoreDisplay2">0</div>
+      </div>
+      <div class="panel-box">
+        <h3 data-i18n="level">Level</h3>
+        <div class="value" id="levelDisplay2">1</div>
+      </div>
+      <div class="panel-box">
+        <h3 data-i18n="lines">Lines</h3>
+        <div class="value" id="linesDisplay2">0</div>
+      </div>
+      <div class="panel-box speed-panel">
+        <h3 data-i18n="speed">Speed</h3>
+        <div class="value" id="speedDisplay">0%</div>
+        <div class="speed-bar-wrap">
+          <div class="speed-bar-fill" id="speedBar"></div>
+        </div>
+      </div>
+      <button class="lb-btn desktop-only" id="leaderboardBtn2">🏆 <span data-i18n="leaderboard">Scores</span></button>
+      <button class="lb-btn desktop-only settings-lb-btn" id="settingsBtn2">⚙️ <span data-i18n="settings">Settings</span></button>
+    </div>
+
+    <!-- Canvas -->
+    <div class="canvas-wrap">
+      <canvas id="gameCanvas" width="300" height="600"></canvas>
+      <!-- Line clear effect overlay -->
+      <canvas id="fxCanvas" width="300" height="600" class="fx-canvas"></canvas>
+
+      <!-- ── Interactive Tutorial (new players) ── -->
+      <div id="tutorialOverlay" class="tutorial-overlay" style="display:none">
+
+        <!-- Dimmer covers canvas except highlighted area -->
+        <div class="tut-dimmer"></div>
+
+        <!-- Callout bubble — repositioned per step via JS -->
+        <div class="tut-bubble" id="tutBubble">
+          <div class="tut-bubble-step" id="tutStep">1 / 6</div>
+          <div class="tut-bubble-icon"  id="tutIcon">👆</div>
+          <div class="tut-bubble-title" id="tutTitle">Move the Block</div>
+          <div class="tut-bubble-desc"  id="tutDesc">Tap ← → to move left or right</div>
+          <!-- Animated gesture arrows drawn on canvas by JS -->
+          <div class="tut-arrow-row" id="tutArrowRow"></div>
+          <div class="tut-bubble-footer">
+            <button class="tut-skip-btn"  id="tutSkipBtn">Skip Tutorial</button>
+            <button class="tut-next-btn"  id="tutNextBtn">Next ▶</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- In-game step hints (first game only) -->
+      <div class="hint-bubble" id="hintBubble" style="display:none">
+        <div class="hint-icon" id="hintIcon">👆</div>
+        <div class="hint-body">
+          <div class="hint-title" id="hintTitle">Move</div>
+          <div class="hint-desc"  id="hintDesc">Tap ← → to move the block</div>
+        </div>
+        <div class="hint-progress">
+          <div class="hint-dot active" data-step="0"></div>
+          <div class="hint-dot" data-step="1"></div>
+          <div class="hint-dot" data-step="2"></div>
+          <div class="hint-dot" data-step="3"></div>
+          <div class="hint-dot" data-step="4"></div>
+        </div>
+      </div>
+
+      <div id="overlay">
+        <div class="overlay-name-tag" id="overlayNameTag"></div>
+        <h2>BLOCK DROP</h2>
+        <div class="overlay-personal-best" id="overlayPersonalBest" style="display:none"></div>
+        <p data-i18n="tap_to_start">Tap or press Space to start</p>
+        <button class="retro-btn" id="startBtn" data-i18n="start_game">▶ Start Game</button>
+        <button class="retro-btn secondary" id="overlayLbBtn" data-i18n="leaderboard">🏆 Leaderboard</button>
+        <button class="retro-btn secondary" id="overlaySettingsBtn" data-i18n="settings">⚙️ Settings</button>
+      </div>
+    </div>
+
+    <!-- Right panel (desktop) -->
+    <div class="right-panel desktop-only">
+      <div class="panel-box">
+        <h3 data-i18n="next">Next</h3>
+        <canvas id="nextCanvas" width="100" height="100"></canvas>
+      </div>
+      <div class="panel-box player-card" id="playerCard">
+        <h3 data-i18n="player">Player</h3>
+        <div class="player-name" id="playerNameDisplay">—</div>
+        <div class="player-stats" id="playerStatsDisplay" style="display:none"></div>
+      </div>
+      <div class="controls">
+        <h3 data-i18n="controls">Controls</h3>
+        <div><span>← →</span> <span data-i18n="move">Move</span></div>
+        <div><span>↑</span> <span data-i18n="rotate">Rotate</span></div>
+        <div><span>↓</span> <span data-i18n="soft_drop">Soft drop</span></div>
+        <div><span>Space</span> <span data-i18n="hard_drop">Hard drop</span></div>
+        <div><span>P</span> <span data-i18n="pause_key">Pause</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Mobile touch controls ── -->
+  <div class="touch-controls mobile-only">
+
+    <!-- Row 1: Move + Rotate -->
+    <div class="touch-row">
+      <button class="t-btn" id="btnLeft"   aria-label="Move Left">◀</button>
+      <button class="t-btn rotate-btn" id="btnRotate" aria-label="Rotate">↻</button>
+      <button class="t-btn" id="btnRight"  aria-label="Move Right">▶</button>
+    </div>
+
+    <!-- Row 2: Drop buttons -->
+    <div class="touch-row">
+      <button class="t-btn wide-btn" id="btnDown" aria-label="Soft Drop">▼ <span data-i18n="soft_drop">Soft</span></button>
+      <button class="t-btn wide-btn drop-btn" id="btnDrop" aria-label="Hard Drop">⬇ <span data-i18n="hard_drop">Drop</span></button>
+    </div>
+
+    <!-- Row 3: Pause / Resume + Start -->
+    <div class="touch-row touch-row-controls">
+      <button class="t-btn pause-btn" id="btnPauseMob" aria-label="Pause">⏸ <span class="pause-label">Pause</span></button>
+      <button class="t-btn start-btn" id="btnStartMob" aria-label="Start Game">▶ <span class="start-label">Start</span></button>
+    </div>
+
+  </div>
+
+  <!-- ── Leaderboard Modal ── -->
+  <div id="lbModal" class="modal-overlay" style="display:none">
+    <div class="modal">
+      <h2 data-i18n="top_scores">🏆 Top Scores</h2>
+      <table id="lbTable">
+        <thead>
+          <tr><th>#</th><th data-i18n="player">Name</th><th data-i18n="score">Score</th><th data-i18n="level">Lvl</th><th data-i18n="lines">Lines</th></tr>
+        </thead>
+        <tbody id="lbBody"></tbody>
+      </table>
+      <button class="retro-btn" id="closeLbBtn" data-i18n="close">Close</button>
+      <button class="retro-btn secondary" id="clearLbBtn" data-i18n="delete_my_data">Clear</button>
+    </div>
+  </div>
+
+  <!-- ── Name entry Modal (post game-over) ── -->
+  <div id="nameModal" class="modal-overlay" style="display:none">
+    <div class="modal">
+      <h2 data-i18n="game_over">Game Over!</h2>
+      <p id="finalScoreText"></p>
+      <p class="sub" data-i18n="enter_name">Enter your name for the leaderboard:</p>
+      <input type="text" id="nameInput" maxlength="20" data-i18n="name_placeholder" placeholder="Your name" autocomplete="off" />
+      <button class="retro-btn" id="saveScoreBtn" data-i18n="save">💾 Save</button>
+      <button class="retro-btn secondary" id="skipScoreBtn" data-i18n="skip">Skip</button>
+    </div>
+  </div>
+
+  <!-- ── Settings Modal ── -->
+  <div id="settingsModal" class="modal-overlay" style="display:none">
+    <div class="modal settings-modal">
+      <h2 data-i18n="settings_title">⚙️ Settings</h2>
+
+      <!-- Player name section -->
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="display_name">Display Name</div>
+        <div class="current-name-row">
+          <span class="current-name-label" data-i18n="current">Current:</span>
+          <span class="current-name-value" id="settingsCurrentName">—</span>
+        </div>
+        <div id="nameChangeForm">
+          <input type="text" id="settingsNameInput" maxlength="20"
+            data-i18n="name_placeholder" placeholder="Enter new name" autocomplete="off" spellcheck="false"/>
+          <div class="name-rules" data-i18n="name_rules">2–20 characters</div>
+          <button class="retro-btn settings-save-btn" id="saveNameBtn" data-i18n="save_name">✔ Save Name</button>
+          <div class="settings-msg" id="settingsMsg"></div>
+        </div>
+        <div id="nameCooldownNotice" style="display:none">
+          <div class="cooldown-box">
+            <div class="cooldown-icon">🔒</div>
+            <div class="cooldown-text"><span data-i18n="name_locked">Name locked for</span> <strong id="cooldownDaysLeft">—</strong> <span data-i18n="more_days">more day(s)</span></div>
+            <div class="cooldown-date"><span data-i18n="next_change">Next change:</span> <span id="cooldownNextDate">—</span></div>
+            <div class="cooldown-bar-wrap"><div class="cooldown-bar-fill" id="cooldownBarFill"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Volume section -->
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="sound_music">Sound &amp; Music</div>
+        <div class="volume-row">
+          <span class="volume-icon">🔊</span>
+          <span class="volume-label" data-i18n="sfx_volume">SFX Volume</span>
+          <input type="range" id="sfxSlider" class="volume-slider" min="0" max="100" value="80"/>
+          <span class="volume-pct" id="sfxPct">80%</span>
+        </div>
+        <div class="volume-row">
+          <span class="volume-icon">🎵</span>
+          <span class="volume-label" data-i18n="music_volume">Music Volume</span>
+          <input type="range" id="musicSlider" class="volume-slider" min="0" max="100" value="50"/>
+          <span class="volume-pct" id="musicPct">50%</span>
+        </div>
+        <div class="mute-row">
+          <button class="toggle-btn" id="muteAllBtn" data-i18n="mute_all">🔇 Mute All</button>
+          <button class="toggle-btn active" id="musicToggleBtn" data-i18n="music_on">🎵 Music On</button>
+        </div>
+      </div>
+
+      <!-- Language section -->
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="language_setting">🌐 Language</div>
+        <div class="current-name-row">
+          <span class="current-name-label">Current:</span>
+          <span class="current-name-value" id="currentLangDisplay">English</span>
+        </div>
+        <button class="retro-btn secondary" id="changeLangBtn" data-i18n="change_language">Change Language</button>
+      </div>
+
+      <!-- Data & Privacy section -->
+      <div class="settings-section">
+        <div class="settings-section-title" data-i18n="privacy_data">Privacy &amp; Data</div>
+        <div class="privacy-links-row">
+          <a href="/privacy.html" target="_blank" class="privacy-link-btn" data-i18n="privacy_policy">📄 Privacy Policy</a>
+          <a href="/data-safety.html" target="_blank" class="privacy-link-btn" data-i18n="data_safety">🛡 Data Safety</a>
+          <a href="/terms.html" target="_blank" class="privacy-link-btn" data-i18n="terms">📋 Terms</a>
+        </div>
+        <button class="retro-btn danger-btn" id="deleteMyDataBtn" data-i18n="delete_my_data">🗑 Delete My Data</button>
+        <button class="retro-btn secondary" id="exportMyDataBtn" data-i18n="export_my_data">📦 Export My Data</button>
+        <div class="settings-msg" id="deleteMsg"></div>
+      </div>
+
+      <button class="retro-btn secondary" id="closeSettingsBtn" data-i18n="close_btn">Close</button>
+    </div>
+  </div>
+
+  <!-- ── Age Gate Modal ── -->
+  <div id="ageGateModal" class="modal-overlay age-gate-overlay" style="display:none">
+    <div class="modal age-gate-modal">
+      <div class="age-gate-icon">🎮</div>
+      <h2 data-i18n="before_you_play">Before You Play</h2>
+      <p class="age-gate-sub" data-i18n="age_gate_sub">Block Drop collects your display name and game scores. Please confirm:</p>
+      <div class="age-confirm-row">
+        <label class="age-checkbox-label">
+          <input type="checkbox" id="ageConfirmCheck"/>
+          <span data-i18n="age_confirm">I am 13 years or older (16+ in the EU)</span>
+        </label>
+      </div>
+      <div class="age-confirm-row">
+        <label class="age-checkbox-label">
+          <input type="checkbox" id="consentCheck"/>
+          <span><span data-i18n="privacy_consent">I agree to the Privacy Policy</span> — <a href="/privacy.html" target="_blank" data-i18n="privacy_policy">Privacy Policy</a></span>
+        </label>
+      </div>
+      <div class="age-confirm-row">
+        <label class="age-checkbox-label">
+          <input type="checkbox" id="termsCheck"/>
+          <span data-i18n="terms_accept">I accept the Terms of Service</span>
+        </label>
+      </div>
+      <div class="fingerprint-notice">
+        🔍 <span data-i18n="fp_notice">Fingerprint notice: This app uses a browser fingerprint (SHA-256 hash — no personal info extracted) to remember you between sessions.</span>
+        <a href="/privacy.html" target="_blank">↗</a>
+      </div>
+      <button class="retro-btn age-gate-btn" id="ageGateAcceptBtn" disabled data-i18n="enter_block_drop">▶ Enter Block Drop</button>
+      <p class="age-gate-under13" data-i18n="under_13">Under 13? This app is not for you.</p>
+    </div>
+  </div>
+
+  <!-- ── ONBOARDING STEP 1: Interactive Demo ── -->
+  <div id="onboardDemoModal" class="modal-overlay onboard-overlay" style="display:none">
+    <div class="onboard-modal onboard-demo-modal">
+
+      <div class="onboard-header">
+        <div class="onboard-step-row">
+          <div class="onboard-dot active"></div>
+          <div class="onboard-dot"></div>
+          <div class="onboard-dot"></div>
+        </div>
+        <h2 class="onboard-title">Learn to Play</h2>
+        <p class="onboard-sub">Watch the bot demo, then <strong class="try-it-label">try it yourself!</strong></p>
+      </div>
+
+      <!-- Demo mode badge -->
+      <div class="demo-mode-badge" id="demoModeBadge">🤖 Bot playing…</div>
+
+      <!-- Mobile phone frame with INTERACTIVE canvas inside -->
+      <div class="phone-frame">
+        <div class="phone-notch"></div>
+        <div class="phone-screen" id="demoPhoneScreen">
+          <canvas id="onboardDemoCanvas" width="160" height="280"></canvas>
+          <!-- Gesture label inside screen -->
+          <div class="phone-label" id="phoneLabel">
+            <span class="phone-label-key" id="phoneLabelKey"></span>
+            <span class="phone-label-text" id="phoneLabelText"></span>
+          </div>
+        </div>
+        <!-- REAL touch buttons — player can press these -->
+        <div class="phone-controls" id="demoPhoneControls">
+          <div class="phone-ctrl-row">
+            <button class="phone-btn demo-interactive-btn" id="demoBtnLeft"   aria-label="Move Left">◀</button>
+            <button class="phone-btn phone-btn-rotate demo-interactive-btn" id="demoBtnRotate" aria-label="Rotate">↻</button>
+            <button class="phone-btn demo-interactive-btn" id="demoBtnRight"  aria-label="Move Right">▶</button>
+          </div>
+          <div class="phone-ctrl-row">
+            <button class="phone-btn phone-btn-wide demo-interactive-btn" id="demoBtnSoft" aria-label="Soft Drop">▼ Soft</button>
+            <button class="phone-btn phone-btn-wide phone-btn-drop demo-interactive-btn" id="demoBtnDrop" aria-label="Hard Drop">⬇ Drop</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Score display for demo game -->
+      <div class="demo-score-row">
+        <span class="demo-score-label">Score</span>
+        <span class="demo-score-val" id="demoScore">0</span>
+        <span class="demo-score-label">Lines</span>
+        <span class="demo-score-val" id="demoLines">0</span>
+      </div>
+
+      <button class="onboard-next-btn" id="onboardDemoNextBtn">
+        I'm Ready — Next →
+      </button>
+    </div>
+  </div>
+
+  <!-- ── ONBOARDING STEP 2: Name Entry (mandatory) ── -->
+  <div id="onboardNameModal" class="modal-overlay onboard-overlay" style="display:none">
+    <div class="onboard-modal onboard-name-modal">
+
+      <div class="onboard-header">
+        <div class="onboard-step-row">
+          <div class="onboard-dot done"></div>
+          <div class="onboard-dot active"></div>
+          <div class="onboard-dot"></div>
+        </div>
+        <div class="onboard-avatar">🧑‍🎮</div>
+        <h2 class="onboard-title">Choose Your Name</h2>
+        <p class="onboard-sub">This appears on the leaderboard. You <strong>must enter a name</strong> to play. You can change it once every 10 days.</p>
+      </div>
+
+      <div class="onboard-name-wrap">
+        <input
+          type="text"
+          id="onboardNameInput"
+          class="onboard-name-input"
+          maxlength="20"
+          placeholder="Type your name here…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <div class="onboard-name-rules">2–20 characters · letters, numbers, spaces</div>
+        <div class="onboard-name-msg" id="onboardNameMsg"></div>
+        <!-- Character counter -->
+        <div class="name-char-counter" id="nameCharCounter">0 / 20</div>
+      </div>
+
+      <!-- Button starts disabled, enables only when valid name typed -->
+      <button class="onboard-next-btn" id="onboardNameNextBtn" disabled>
+        Save Name &amp; Continue →
+      </button>
+      <p class="name-required-note">⚠️ A name is required to start playing</p>
+    </div>
+  </div>
+
+  <!-- ── ONBOARDING STEP 3: Legal Countries ── -->
+  <div id="onboardCountriesModal" class="modal-overlay onboard-overlay" style="display:none">
+    <div class="onboard-modal onboard-countries-modal">
+
+      <div class="onboard-header">
+        <div class="onboard-step-row">
+          <div class="onboard-dot done"></div>
+          <div class="onboard-dot done"></div>
+          <div class="onboard-dot active"></div>
+        </div>
+        <h2 class="onboard-title">Available In</h2>
+        <p class="onboard-sub">Block Drop is legally available on Google Play in these countries</p>
+      </div>
+
+      <!-- Scrollable flag grid -->
+      <div class="countries-scroll-wrap">
+        <div class="countries-grid">
+          <!-- Americas -->
+          <div class="country-group-label">Americas</div>
+          <div class="country-chip">🇺🇸 USA</div>
+          <div class="country-chip">🇧🇷 Brazil</div>
+          <div class="country-chip">🇨🇦 Canada</div>
+          <div class="country-chip">🇲🇽 Mexico</div>
+          <div class="country-chip">🇦🇷 Argentina</div>
+          <div class="country-chip">🇨🇴 Colombia</div>
+          <div class="country-chip">🇨🇱 Chile</div>
+          <div class="country-chip">🇵🇪 Peru</div>
+          <div class="country-chip">🇻🇪 Venezuela</div>
+          <div class="country-chip">🇪🇨 Ecuador</div>
+          <div class="country-chip">🇧🇴 Bolivia</div>
+          <div class="country-chip">🇵🇾 Paraguay</div>
+          <div class="country-chip">🇺🇾 Uruguay</div>
+          <div class="country-chip">🇬🇹 Guatemala</div>
+          <div class="country-chip">🇨🇷 Costa Rica</div>
+          <div class="country-chip">🇵🇦 Panama</div>
+          <div class="country-chip">🇩🇴 Dominican Rep.</div>
+          <div class="country-chip">🇯🇲 Jamaica</div>
+          <div class="country-chip">🇹🇹 Trinidad</div>
+          <div class="country-chip">🇧🇧 Barbados</div>
+
+          <!-- Europe -->
+          <div class="country-group-label">Europe</div>
+          <div class="country-chip">🇬🇧 UK</div>
+          <div class="country-chip">🇩🇪 Germany</div>
+          <div class="country-chip">🇫🇷 France</div>
+          <div class="country-chip">🇮🇹 Italy</div>
+          <div class="country-chip">🇪🇸 Spain</div>
+          <div class="country-chip">🇳🇱 Netherlands</div>
+          <div class="country-chip">🇵🇱 Poland</div>
+          <div class="country-chip">🇵🇹 Portugal</div>
+          <div class="country-chip">🇸🇪 Sweden</div>
+          <div class="country-chip">🇳🇴 Norway</div>
+          <div class="country-chip">🇩🇰 Denmark</div>
+          <div class="country-chip">🇫🇮 Finland</div>
+          <div class="country-chip">🇧🇪 Belgium</div>
+          <div class="country-chip">🇨🇭 Switzerland</div>
+          <div class="country-chip">🇦🇹 Austria</div>
+          <div class="country-chip">🇨🇿 Czech Rep.</div>
+          <div class="country-chip">🇭🇺 Hungary</div>
+          <div class="country-chip">🇷🇴 Romania</div>
+          <div class="country-chip">🇬🇷 Greece</div>
+          <div class="country-chip">🇧🇬 Bulgaria</div>
+          <div class="country-chip">🇭🇷 Croatia</div>
+          <div class="country-chip">🇸🇰 Slovakia</div>
+          <div class="country-chip">🇸🇮 Slovenia</div>
+          <div class="country-chip">🇱🇹 Lithuania</div>
+          <div class="country-chip">🇱🇻 Latvia</div>
+          <div class="country-chip">🇪🇪 Estonia</div>
+          <div class="country-chip">🇮🇪 Ireland</div>
+          <div class="country-chip">🇮🇸 Iceland</div>
+          <div class="country-chip">🇲🇹 Malta</div>
+          <div class="country-chip">🇨🇾 Cyprus</div>
+          <div class="country-chip">🇱🇺 Luxembourg</div>
+          <div class="country-chip">🇦🇱 Albania</div>
+          <div class="country-chip">🇷🇸 Serbia</div>
+          <div class="country-chip">🇲🇰 N. Macedonia</div>
+          <div class="country-chip">🇧🇦 Bosnia</div>
+          <div class="country-chip">🇲🇪 Montenegro</div>
+
+          <!-- Asia-Pacific -->
+          <div class="country-group-label">Asia-Pacific</div>
+          <div class="country-chip">🇮🇳 India</div>
+          <div class="country-chip">🇯🇵 Japan</div>
+          <div class="country-chip">🇰🇷 South Korea</div>
+          <div class="country-chip">🇦🇺 Australia</div>
+          <div class="country-chip">🇳🇿 New Zealand</div>
+          <div class="country-chip">🇸🇬 Singapore</div>
+          <div class="country-chip">🇮🇩 Indonesia</div>
+          <div class="country-chip">🇵🇭 Philippines</div>
+          <div class="country-chip">🇹🇭 Thailand</div>
+          <div class="country-chip">🇲🇾 Malaysia</div>
+          <div class="country-chip">🇻🇳 Vietnam</div>
+          <div class="country-chip">🇧🇩 Bangladesh</div>
+          <div class="country-chip">🇵🇰 Pakistan</div>
+          <div class="country-chip">🇱🇰 Sri Lanka</div>
+          <div class="country-chip">🇳🇵 Nepal</div>
+          <div class="country-chip">🇰🇭 Cambodia</div>
+          <div class="country-chip">🇲🇲 Myanmar</div>
+          <div class="country-chip">🇹🇼 Taiwan</div>
+          <div class="country-chip">🇭🇰 Hong Kong</div>
+          <div class="country-chip">🇲🇴 Macau</div>
+          <div class="country-chip">🇵🇬 Papua NG</div>
+          <div class="country-chip">🇫🇯 Fiji</div>
+
+          <!-- Middle East & Central Asia -->
+          <div class="country-group-label">Middle East</div>
+          <div class="country-chip">🇸🇦 Saudi Arabia</div>
+          <div class="country-chip">🇦🇪 UAE</div>
+          <div class="country-chip">🇹🇷 Turkey</div>
+          <div class="country-chip">🇮🇱 Israel</div>
+          <div class="country-chip">🇯🇴 Jordan</div>
+          <div class="country-chip">🇱🇧 Lebanon</div>
+          <div class="country-chip">🇶🇦 Qatar</div>
+          <div class="country-chip">🇰🇼 Kuwait</div>
+          <div class="country-chip">🇧🇭 Bahrain</div>
+          <div class="country-chip">🇴🇲 Oman</div>
+          <div class="country-chip">🇮🇶 Iraq</div>
+          <div class="country-chip">🇪🇬 Egypt</div>
+          <div class="country-chip">🇦🇿 Azerbaijan</div>
+          <div class="country-chip">🇬🇪 Georgia</div>
+          <div class="country-chip">🇦🇲 Armenia</div>
+          <div class="country-chip">🇰🇿 Kazakhstan</div>
+          <div class="country-chip">🇺🇿 Uzbekistan</div>
+
+          <!-- Africa -->
+          <div class="country-group-label">Africa</div>
+          <div class="country-chip">🇳🇬 Nigeria</div>
+          <div class="country-chip">🇿🇦 South Africa</div>
+          <div class="country-chip">🇰🇪 Kenya</div>
+          <div class="country-chip">🇬🇭 Ghana</div>
+          <div class="country-chip">🇹🇿 Tanzania</div>
+          <div class="country-chip">🇺🇬 Uganda</div>
+          <div class="country-chip">🇿🇲 Zambia</div>
+          <div class="country-chip">🇿🇼 Zimbabwe</div>
+          <div class="country-chip">🇨🇲 Cameroon</div>
+          <div class="country-chip">🇸🇳 Senegal</div>
+          <div class="country-chip">🇨🇮 Côte d'Ivoire</div>
+          <div class="country-chip">🇪🇹 Ethiopia</div>
+          <div class="country-chip">🇷🇼 Rwanda</div>
+          <div class="country-chip">🇲🇿 Mozambique</div>
+          <div class="country-chip">🇲🇦 Morocco</div>
+          <div class="country-chip">🇹🇳 Tunisia</div>
+          <div class="country-chip">🇩🇿 Algeria</div>
+          <div class="country-chip">🇦🇴 Angola</div>
+
+          <!-- Not available -->
+          <div class="country-group-label not-available-label">Not Available</div>
+          <div class="country-chip country-chip-blocked">🚫 China</div>
+          <div class="country-chip country-chip-blocked">🚫 Russia</div>
+          <div class="country-chip country-chip-blocked">🚫 North Korea</div>
+          <div class="country-chip country-chip-blocked">🚫 Iran</div>
+          <div class="country-chip country-chip-blocked">🚫 Cuba</div>
+          <div class="country-chip country-chip-blocked">🚫 Syria</div>
+        </div>
+      </div>
+
+      <button class="onboard-next-btn onboard-play-btn" id="onboardCountriesNextBtn">
+        ▶ Start Playing!
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Consent Banner ── -->
+  <div id="consentBanner" class="consent-banner" style="display:none">
+    <div class="consent-banner-text">
+      <span data-i18n="consent_text">Block Drop stores your display name &amp; scores on our server.</span>
+      <a href="/privacy.html" target="_blank" data-i18n="privacy_policy">Privacy Policy</a> ·
+      <a href="/data-safety.html" target="_blank" data-i18n="data_safety">Data Safety</a>
+    </div>
+    <button class="consent-banner-btn" id="consentBannerOk" data-i18n="got_it">Got it ✓</button>
+  </div>
+
+  <!-- ── Delete Confirmation Modal ── -->
+  <div id="deleteConfirmModal" class="modal-overlay" style="display:none">
+    <div class="modal">
+      <h2 data-i18n="delete_title">🗑 Delete My Data</h2>
+      <p data-i18n="delete_body">This will permanently delete your display name, all your scores, and your player profile.</p>
+      <p class="sub" data-i18n="delete_sub">This cannot be undone.</p>
+      <button class="retro-btn danger-btn" id="confirmDeleteBtn" data-i18n="yes_delete">Yes, Delete Everything</button>
+      <button class="retro-btn secondary" id="cancelDeleteBtn" data-i18n="cancel">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ── Compliance Footer ── -->
+  <footer class="compliance-footer">
+    <div class="footer-links">
+      <a href="/privacy.html" data-i18n="privacy_policy">Privacy Policy</a>
+      <span>·</span>
+      <a href="/terms.html" data-i18n="terms">Terms of Service</a>
+      <span>·</span>
+      <a href="/data-safety.html" data-i18n="data_safety">Data Safety</a>
+      <span>·</span>
+      <a href="#" id="deleteMyDataLink" data-i18n="delete_my_data_link">Delete My Data</a>
+    </div>
+    <div class="footer-rating" data-i18n="footer_rating">
+      Rated: Everyone · PEGI 3 · No gambling · No ads · No in-app purchases
+    </div>
+  </footer>
+
+  <!-- ── How to Play Modal (touch guide) ── -->
+  <div id="howToPlayModal" class="modal-overlay htp-overlay" style="display:none">
+    <div class="modal htp-modal">
+
+      <div class="htp-header">
+        <h2>📱 How to Play</h2>
+        <p class="htp-sub">Block Drop on touchscreen</p>
+      </div>
+
+      <!-- Gesture guide cards -->
+      <div class="htp-grid">
+
+        <div class="htp-card">
+          <div class="htp-gesture">
+            <div class="htp-finger htp-swipe-left"></div>
+          </div>
+          <div class="htp-desc">
+            <strong>Swipe Left</strong>
+            <span>Move block left</span>
+          </div>
+        </div>
+
+        <div class="htp-card">
+          <div class="htp-gesture">
+            <div class="htp-finger htp-swipe-right"></div>
+          </div>
+          <div class="htp-desc">
+            <strong>Swipe Right</strong>
+            <span>Move block right</span>
+          </div>
+        </div>
+
+        <div class="htp-card">
+          <div class="htp-gesture">
+            <div class="htp-finger htp-tap"></div>
+          </div>
+          <div class="htp-desc">
+            <strong>Tap</strong>
+            <span>Rotate block</span>
+          </div>
+        </div>
+
+        <div class="htp-card">
+          <div class="htp-gesture">
+            <div class="htp-finger htp-swipe-up"></div>
+          </div>
+          <div class="htp-desc">
+            <strong>Swipe Up</strong>
+            <span>Rotate block</span>
+          </div>
+        </div>
+
+        <div class="htp-card">
+          <div class="htp-gesture">
+            <div class="htp-finger htp-swipe-down"></div>
+          </div>
+          <div class="htp-desc">
+            <strong>Swipe Down</strong>
+            <span>Hard drop instantly</span>
+          </div>
+        </div>
+
+        <div class="htp-card">
+          <div class="htp-gesture htp-gesture-btn">
+            <div class="htp-btn-icon">▼</div>
+          </div>
+          <div class="htp-desc">
+            <strong>Soft button</strong>
+            <span>Drop one row (+1 pt)</span>
+          </div>
+        </div>
+
+        <div class="htp-card">
+          <div class="htp-gesture htp-gesture-btn htp-gesture-drop">
+            <div class="htp-btn-icon">⬇</div>
+          </div>
+          <div class="htp-desc">
+            <strong>Drop button</strong>
+            <span>Drop to bottom (+2 pt/row)</span>
+          </div>
+        </div>
+
+        <div class="htp-card">
+          <div class="htp-gesture htp-gesture-btn htp-gesture-pause">
+            <div class="htp-btn-icon">⏸</div>
+          </div>
+          <div class="htp-desc">
+            <strong>Pause button</strong>
+            <span>Pause / Resume game</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Tips section -->
+      <div class="htp-tips">
+        <div class="htp-tip">💡 Clear multiple lines at once for bonus points</div>
+        <div class="htp-tip">🏆 Clearing 4 lines at once = <strong>TETRIS!</strong></div>
+        <div class="htp-tip">👻 The ghost piece shows where your block will land</div>
+        <div class="htp-tip">⚡ Speed increases every 10 lines — stay sharp</div>
+      </div>
+
+      <!-- Scoring table -->
+      <div class="htp-scoring">
+        <div class="htp-score-title">Scoring</div>
+        <div class="htp-score-row"><span>1 line</span><strong>100 × Level</strong></div>
+        <div class="htp-score-row"><span>2 lines</span><strong>300 × Level</strong></div>
+        <div class="htp-score-row"><span>3 lines</span><strong>500 × Level</strong></div>
+        <div class="htp-score-row htp-tetris-row"><span>4 lines 🎉</span><strong>800 × Level</strong></div>
+        <div class="htp-score-row"><span>Soft drop</span><strong>+1 per row</strong></div>
+        <div class="htp-score-row"><span>Hard drop</span><strong>+2 per row</strong></div>
+      </div>
+
+      <button class="retro-btn htp-close-btn" id="closeHowToPlayBtn">Got it — Let's Play! ▶</button>
+      <p class="htp-hint">Tap ❓ anytime to see this guide again</p>
+
+    </div>
+  </div>
+
+  <!-- i18n must load before game.js -->
+  <script src="i18n.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

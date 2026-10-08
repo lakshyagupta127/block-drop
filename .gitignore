@@ -1,0 +1,5 @@
+node_modules/
+.env
+tetris.db
+*.db-shm
+*.db-wal

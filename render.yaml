@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: block-drop
+    runtime: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_FILE
+        value: /data/tetris.db
+      - key: PORT
+        value: 3000
+    disk:
+      name: blockdrop-db
+      mountPath: /data
+      sizeGB: 1

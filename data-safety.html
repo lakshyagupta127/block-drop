@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Safety — Block Drop</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#0d0d1a;color:#ccc;font-family:'Courier New',monospace;line-height:1.8;padding:0 0 60px}
+    .header{background:#1a1a2e;border-bottom:1px solid #333;padding:20px 32px;display:flex;align-items:center;gap:16px}
+    .header a{color:#00f0f0;text-decoration:none;font-size:13px}
+    .header h1{font-size:20px;color:#fff;letter-spacing:3px}
+    .container{max-width:800px;margin:0 auto;padding:40px 24px}
+    h2{color:#00f0f0;font-size:16px;letter-spacing:2px;text-transform:uppercase;margin:32px 0 16px;border-bottom:1px solid #1a1a2e;padding-bottom:8px}
+    p{margin-bottom:12px;font-size:14px}
+    .updated{color:#555;font-size:12px;margin-bottom:32px}
+    a{color:#00f0f0}
+    .card{background:#1a1a2e;border:1px solid #333;border-radius:10px;padding:20px;margin-bottom:16px}
+    .card-title{font-size:15px;color:#fff;font-weight:bold;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+    .card p{color:#aaa;font-size:13px;margin-bottom:6px}
+    .tag{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;margin:2px}
+    .tag-yes{background:#1a2a1a;color:#44ff88;border:1px solid #44ff8844}
+    .tag-no{background:#2a1a1a;color:#ff4466;border:1px solid #ff446644}
+    .tag-local{background:#1a2a3a;color:#44aaff;border:1px solid #44aaff44}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0}
+    th{background:#111122;color:#888;padding:10px 12px;text-align:left;border:1px solid #222}
+    td{padding:10px 12px;border:1px solid #1a1a2e;vertical-align:top}
+    .icon{font-size:20px}
+  </style>
+</head>
+<body>
+<div class="header">
+  <a href="/">← Back to Game</a>
+  <h1>BLOCK DROP</h1>
+</div>
+<div class="container">
+  <h1 style="color:#fff;font-size:24px;letter-spacing:4px;margin-bottom:8px">Data Safety</h1>
+  <p class="updated">This page mirrors the Google Play Data Safety section declaration. Last updated: October 7, 2026</p>
+
+  <h2>At a Glance</h2>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">🔒</span> Data Security</div>
+    <p><span class="tag tag-yes">✔ Data encrypted in transit</span></p>
+    <p><span class="tag tag-yes">✔ You can request data deletion</span></p>
+    <p><span class="tag tag-no">✗ No third-party data sharing</span></p>
+    <p><span class="tag tag-no">✗ No data sold to third parties</span></p>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">📦</span> Data Collected &amp; Shared</div>
+    <p>Block Drop collects minimal data required to operate the leaderboard and prevent cheating.</p>
+    <p><span class="tag tag-yes">✔ Name (display name — chosen by you)</span></p>
+    <p><span class="tag tag-yes">✔ App activity (scores, level, lines)</span></p>
+    <p><span class="tag tag-yes">✔ Device or other identifiers (browser fingerprint hash)</span></p>
+    <p><span class="tag tag-local">🖥 App settings (volume) — local only, not shared</span></p>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">👤</span> Data NOT Collected</div>
+    <p><span class="tag tag-no">✗ Location</span>
+    <span class="tag tag-no">✗ Email address</span>
+    <span class="tag tag-no">✗ Phone number</span>
+    <span class="tag tag-no">✗ Contacts</span>
+    <span class="tag tag-no">✗ Photos / media</span>
+    <span class="tag tag-no">✗ Health data</span>
+    <span class="tag tag-no">✗ Financial info</span>
+    <span class="tag tag-no">✗ Messages</span>
+    <span class="tag tag-no">✗ Microphone / camera</span></p>
+  </div>
+
+  <h2>Detailed Data Table</h2>
+  <table>
+    <tr>
+      <th>Data Type</th>
+      <th>Collected</th>
+      <th>Shared</th>
+      <th>Encrypted</th>
+      <th>Optional</th>
+      <th>Deletion</th>
+      <th>Purpose</th>
+    </tr>
+    <tr>
+      <td>Display name</td>
+      <td>✔ Yes</td>
+      <td>✗ No</td>
+      <td>✔ In transit</td>
+      <td>✔ Yes</td>
+      <td>✔ On request</td>
+      <td>Leaderboard</td>
+    </tr>
+    <tr>
+      <td>Game score</td>
+      <td>✔ Yes</td>
+      <td>✗ No</td>
+      <td>✔ In transit</td>
+      <td>✔ Yes (skip score submission)</td>
+      <td>✔ On request</td>
+      <td>Leaderboard</td>
+    </tr>
+    <tr>
+      <td>Level reached</td>
+      <td>✔ Yes</td>
+      <td>✗ No</td>
+      <td>✔ In transit</td>
+      <td>✔ Yes</td>
+      <td>✔ On request</td>
+      <td>Leaderboard</td>
+    </tr>
+    <tr>
+      <td>Lines cleared</td>
+      <td>✔ Yes</td>
+      <td>✗ No</td>
+      <td>✔ In transit</td>
+      <td>✔ Yes</td>
+      <td>✔ On request</td>
+      <td>Leaderboard</td>
+    </tr>
+    <tr>
+      <td>Session duration</td>
+      <td>✔ Yes</td>
+      <td>✗ No</td>
+      <td>✔ In transit</td>
+      <td>✔ Yes</td>
+      <td>✔ On request</td>
+      <td>Score validation</td>
+    </tr>
+    <tr>
+      <td>Device type</td>
+      <td>✔ Yes</td>
+      <td>✗ No</td>
+      <td>✔ In transit</td>
+      <td>✔ Yes</td>
+      <td>✔ On request</td>
+      <td>Analytics</td>
+    </tr>
+    <tr>
+      <td>Browser fingerprint (hash)</td>
+      <td>✔ Yes</td>
+      <td>✗ No</td>
+      <td>✔ In transit</td>
+      <td>✗ Required for leaderboard</td>
+      <td>✔ On request</td>
+      <td>Player identity</td>
+    </tr>
+    <tr>
+      <td>Volume preferences</td>
+      <td>Local only</td>
+      <td>✗ No</td>
+      <td>N/A</td>
+      <td>✔ Yes</td>
+      <td>Clear browser data</td>
+      <td>Personalisation</td>
+    </tr>
+    <tr>
+      <td>Age confirmation</td>
+      <td>Local only</td>
+      <td>✗ No</td>
+      <td>N/A</td>
+      <td>✗ Required</td>
+      <td>Clear browser data</td>
+      <td>COPPA compliance</td>
+    </tr>
+    <tr>
+      <td>IP address</td>
+      <td>Temporary</td>
+      <td>✗ No</td>
+      <td>N/A</td>
+      <td>✗ Required</td>
+      <td>Not stored</td>
+      <td>Rate limiting / security</td>
+    </tr>
+  </table>
+
+  <h2>Data Deletion</h2>
+  <p>You can delete all your stored data (display name, scores, fingerprint) at any time:</p>
+  <ul style="font-size:14px;margin:8px 0 16px 20px">
+    <li><strong>In-app:</strong> Settings (⚙️) → Delete My Data</li>
+    <li><strong>By email:</strong> Contact us at <strong>[YOUR EMAIL]</strong> with subject "Data Deletion Request"</li>
+  </ul>
+  <p>We will process deletion requests within <strong>30 days</strong>.</p>
+
+  <h2>Third-Party Services</h2>
+  <p>Block Drop does not use any third-party SDKs, analytics services, advertising networks, or social login providers. All data stays on our own server.</p>
+
+  <div style="margin-top:40px;padding-top:20px;border-top:1px solid #1a1a2e;display:flex;gap:16px;flex-wrap:wrap">
+    <a href="/">← Back to Game</a>
+    <a href="/privacy.html">Privacy Policy</a>
+    <a href="/terms.html">Terms of Service</a>
+  </div>
+</div>
+</body>
+</html>

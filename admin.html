@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Block Drop — Admin</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#0d0d1a; color:#e0e0ff; font-family:'Courier New',monospace; min-height:100vh; }
+
+    /* ── Login screen ── */
+    #loginScreen {
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; min-height:100vh; gap:16px;
+    }
+    #loginScreen h1 { font-size:28px; letter-spacing:4px; color:#00f0f0;
+      text-shadow:0 0 18px #00f0f088; }
+    #loginScreen p  { color:#888; font-size:13px; }
+    #loginScreen input {
+      padding:12px 18px; background:#1a1a2e; border:1px solid #444;
+      border-radius:8px; color:#e0e0ff; font-size:16px;
+      font-family:'Courier New',monospace; width:280px; text-align:center;
+      outline:none;
+    }
+    #loginScreen input:focus { border-color:#00f0f0; }
+    #loginError { color:#ff4466; font-size:13px; display:none; }
+
+    /* ── Dashboard ── */
+    #dashboard { display:none; padding:24px; }
+
+    .dash-header {
+      display:flex; justify-content:space-between; align-items:center;
+      margin-bottom:24px; flex-wrap:wrap; gap:12px;
+      border-bottom:1px solid #333; padding-bottom:16px;
+    }
+    .dash-header h1 { font-size:22px; letter-spacing:3px; color:#00f0f0; }
+    .dash-header span { font-size:12px; color:#666; }
+
+    .stats-row {
+      display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap;
+    }
+    .stat-card {
+      background:#1a1a2e; border:1px solid #333; border-radius:10px;
+      padding:14px 20px; min-width:120px;
+    }
+    .stat-card .label { font-size:10px; color:#888; letter-spacing:1px; text-transform:uppercase; }
+    .stat-card .val   { font-size:26px; font-weight:900; color:#e0e0ff; margin-top:4px; }
+
+    .controls {
+      display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      padding:9px 20px; border:1px solid #555; border-radius:7px;
+      font-family:'Courier New',monospace; font-size:13px; cursor:pointer;
+      transition:filter .15s, transform .1s;
+    }
+    .btn:hover { filter:brightness(1.2); }
+    .btn:active { transform:translateY(1px); }
+    .btn-primary  { background:#1a1a4a; color:#00f0f0; border-color:#00f0f088; }
+    .btn-danger   { background:#3a0a1a; color:#ff4466; border-color:#ff446688; }
+    .btn-secondary{ background:#1a1a2e; color:#888; }
+    .btn-logout   { background:transparent; color:#666; border-color:#333; font-size:12px; }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x:auto; border-radius:10px; border:1px solid #333; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    thead th {
+      background:#111122; color:#888; font-size:10px; letter-spacing:1px;
+      text-transform:uppercase; padding:10px 14px; text-align:left;
+      border-bottom:1px solid #333;
+    }
+    tbody td { padding:10px 14px; border-bottom:1px solid #1a1a2e; }
+    tbody tr:hover td { background:#151525; }
+    tbody tr:nth-child(1) td { color:#ffd700; }
+    tbody tr:nth-child(2) td { color:#c0c0c0; }
+    tbody tr:nth-child(3) td { color:#cd7f32; }
+
+    .badge {
+      display:inline-block; padding:2px 8px; border-radius:20px;
+      font-size:10px; letter-spacing:0.5px;
+    }
+    .badge-mobile  { background:#1a2a4a; color:#6699ff; }
+    .badge-desktop { background:#1a3a2a; color:#66ff99; }
+    .badge-tablet  { background:#3a2a1a; color:#ffaa44; }
+    .badge-unknown { background:#2a2a2a; color:#888; }
+
+    .del-btn {
+      background:transparent; border:1px solid #ff446644;
+      color:#ff4466; border-radius:5px; padding:3px 10px;
+      font-size:11px; cursor:pointer; font-family:'Courier New',monospace;
+    }
+    .del-btn:hover { background:#3a0a1a; }
+
+    .empty-msg { text-align:center; color:#555; padding:32px; font-size:13px; }
+
+    /* toast */
+    #toast {
+      position:fixed; bottom:24px; right:24px;
+      background:#1a2a1a; border:1px solid #44aa66;
+      color:#66ff99; padding:12px 20px; border-radius:8px;
+      font-size:13px; display:none; z-index:999;
+      box-shadow:0 4px 20px rgba(0,0,0,0.5);
+    }
+    #toast.error { background:#2a1a1a; border-color:#ff4466; color:#ff4466; }
+  </style>
+</head>
+<body>
+
+<!-- ── Login ── -->
+<div id="loginScreen">
+  <h1>🔐 BLOCK DROP</h1>
+  <p>Admin access only</p>
+  <input type="password" id="pwInput" placeholder="Enter admin password" autocomplete="current-password"/>
+  <button class="btn btn-primary" id="loginBtn">Unlock Dashboard</button>
+  <p id="loginError">Wrong password. Try again.</p>
+</div>
+
+<!-- ── Dashboard ── -->
+<div id="dashboard">
+  <div class="dash-header">
+    <div>
+      <h1>📊 BLOCK DROP ADMIN</h1>
+      <span id="lastRefresh">—</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="btn btn-primary" id="refreshBtn">⟳ Refresh</button>
+      <button class="btn btn-logout"  id="logoutBtn">Logout</button>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card"><div class="label">Total Scores</div><div class="val" id="statTotal">—</div></div>
+    <div class="stat-card"><div class="label">Top Score</div>   <div class="val" id="statTop">—</div></div>
+    <div class="stat-card"><div class="label">Avg Score</div>   <div class="val" id="statAvg">—</div></div>
+    <div class="stat-card"><div class="label">Avg Level</div>   <div class="val" id="statLvl">—</div></div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-danger" id="clearAllBtn">🗑 Clear All Scores</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Score</th>
+          <th>Level</th>
+          <th>Lines</th>
+          <th>Duration</th>
+          <th>Device</th>
+          <th>Date</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="scoresBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  let adminToken = sessionStorage.getItem('bd_admin_token') || null;
+
+  // ── Toast ──────────────────────────────────
+  function toast(msg, isError = false) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className   = isError ? 'error' : '';
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 3000);
+  }
+
+  // ── Login ──────────────────────────────────
+  async function login() {
+    const pw  = document.getElementById('pwInput').value;
+    const err = document.getElementById('loginError');
+    err.style.display = 'none';
+
+    try {
+      const res  = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        adminToken = data.token;
+        sessionStorage.setItem('bd_admin_token', adminToken);
+        showDashboard();
+      } else {
+        err.style.display = 'block';
+        document.getElementById('pwInput').value = '';
+      }
+    } catch {
+      err.textContent = 'Server unreachable.';
+      err.style.display = 'block';
+    }
+  }
+
+  function logout() {
+    adminToken = null;
+    sessionStorage.removeItem('bd_admin_token');
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('pwInput').value = '';
+  }
+
+  // ── Dashboard ──────────────────────────────
+  function showDashboard() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    loadScores();
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, c =>
+      ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
+  function fmtDuration(s) {
+    if (!s) return '—';
+    const m = Math.floor(s / 60), sec = s % 60;
+    return m ? `${m}m ${sec}s` : `${sec}s`;
+  }
+
+  async function loadScores() {
+    try {
+      const res  = await fetch('/api/admin/scores?limit=200', {
+        headers: { 'Authorization': `Bearer ${adminToken}` },
+      });
+
+      if (res.status === 401) { logout(); return; }
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+
+      const scores = data.scores;
+      const medals = ['🥇','🥈','🥉'];
+
+      // Stats
+      document.getElementById('statTotal').textContent = data.total;
+      document.getElementById('statTop').textContent   =
+        scores.length ? Number(scores[0].score).toLocaleString() : '—';
+      document.getElementById('statAvg').textContent   =
+        scores.length ? Math.round(scores.reduce((a,s)=>a+s.score,0)/scores.length).toLocaleString() : '—';
+      document.getElementById('statLvl').textContent   =
+        scores.length ? (scores.reduce((a,s)=>a+s.level,0)/scores.length).toFixed(1) : '—';
+
+      document.getElementById('lastRefresh').textContent =
+        'Last refreshed: ' + new Date().toLocaleTimeString();
+
+      const tbody = document.getElementById('scoresBody');
+      if (!scores.length) {
+        tbody.innerHTML = `<tr><td colspan="9" class="empty-msg">No scores yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = scores.map((s, i) => `
+        <tr>
+          <td>${medals[i] || i+1}</td>
+          <td>${escHtml(s.name)}</td>
+          <td><strong>${Number(s.score).toLocaleString()}</strong></td>
+          <td>${s.level}</td>
+          <td>${s.lines}</td>
+          <td>${fmtDuration(s.duration_s)}</td>
+          <td><span class="badge badge-${escHtml(s.device)}">${escHtml(s.device)}</span></td>
+          <td>${new Date(s.created_at).toLocaleDateString()}</td>
+          <td><button class="del-btn" onclick="deleteScore(${s.id})">✕ Remove</button></td>
+        </tr>
+      `).join('');
+    } catch (err) {
+      toast('Failed to load scores: ' + err.message, true);
+    }
+  }
+
+  async function deleteScore(id) {
+    if (!confirm('Remove this score permanently?')) return;
+    try {
+      const res  = await fetch(`/api/admin/scores/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${adminToken}` },
+      });
+      const data = await res.json();
+      if (data.success) { toast('Score removed.'); loadScores(); }
+      else toast('Delete failed: ' + data.error, true);
+    } catch { toast('Server error.', true); }
+  }
+
+  async function clearAll() {
+    if (!confirm('Delete ALL scores permanently? This cannot be undone.')) return;
+    if (!confirm('Are you absolutely sure?')) return;
+    try {
+      const res  = await fetch('/api/admin/scores', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${adminToken}` },
+      });
+      const data = await res.json();
+      if (data.success) { toast('All scores cleared.'); loadScores(); }
+      else toast('Clear failed: ' + data.error, true);
+    } catch { toast('Server error.', true); }
+  }
+
+  // ── Event listeners ─────────────────────────
+  document.getElementById('loginBtn').addEventListener('click', login);
+  document.getElementById('pwInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') login();
+  });
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('refreshBtn').addEventListener('click', loadScores);
+  document.getElementById('clearAllBtn').addEventListener('click', clearAll);
+
+  // ── Auto-login if token in sessionStorage ───
+  if (adminToken) showDashboard();
+</script>
+</body>
+</html>
