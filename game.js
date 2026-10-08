@@ -328,7 +328,13 @@ async function apiSaveScore(name, score, level, lines) {
     const duration = _gameStartTs ? Math.floor((Date.now()-_gameStartTs)/1000) : 0;
     const res = await fetch(`${API}/scores`,{
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name,score,level,lines,duration,device:detectDevice(),gameToken:_gameToken}),
+      body:JSON.stringify({
+        name, score, level, lines, duration,
+        device:       detectDevice(),
+        gameToken:    _gameToken,
+        country_code: _playerCountry.code || '',
+        country_flag: _playerCountry.flag || '',
+      }),
     });
     const data=await res.json();
     _gameToken=null;
@@ -731,7 +737,12 @@ function renderLBRows(scores) {
   tbody.innerHTML=scores.map((e,i)=>`
     <tr>
       <td>${medals[i]||i+1}</td>
-      <td>${escHtml(e.name)}</td>
+      <td>
+        <div class="lb-name-cell">
+          ${e.country_flag ? `<span class="lb-flag">${escHtml(e.country_flag)}</span>` : ''}
+          <span>${escHtml(e.name)}</span>
+        </div>
+      </td>
       <td><strong>${Number(e.score).toLocaleString()}</strong></td>
       <td>${e.level}</td>
       <td>${e.lines}</td>
@@ -1206,7 +1217,10 @@ window.endGame = function endGame(){
 };
 
 // ── Init on page load ─────────────────────────
-(async function init(){ await loadPlayerProfile(); })();
+(async function init(){
+  loadSavedCountry();
+  await loadPlayerProfile();
+})();
 
 // ── Pause button keyboard shortcut ─────────────
 document.addEventListener('keydown',e=>{ if(e.code==='KeyS'&&!gameRunning) openSettingsAndInit(); });
@@ -1625,10 +1639,181 @@ async function submitOnboardName(){
   showOnboardCountries();
 }
 
-// ── STEP 3 — Countries → start screen ──────────
+// ── STEP 3 — Country Picker ────────────────────
+
+const COUNTRY_KEY = 'bd_country';
+
+const COUNTRIES = [
+  {code:'US',flag:'🇺🇸',name:'USA',group:'Americas'},
+  {code:'BR',flag:'🇧🇷',name:'Brazil',group:'Americas'},
+  {code:'CA',flag:'🇨🇦',name:'Canada',group:'Americas'},
+  {code:'MX',flag:'🇲🇽',name:'Mexico',group:'Americas'},
+  {code:'AR',flag:'🇦🇷',name:'Argentina',group:'Americas'},
+  {code:'CO',flag:'🇨🇴',name:'Colombia',group:'Americas'},
+  {code:'CL',flag:'🇨🇱',name:'Chile',group:'Americas'},
+  {code:'PE',flag:'🇵🇪',name:'Peru',group:'Americas'},
+  {code:'VE',flag:'🇻🇪',name:'Venezuela',group:'Americas'},
+  {code:'EC',flag:'🇪🇨',name:'Ecuador',group:'Americas'},
+  {code:'BO',flag:'🇧🇴',name:'Bolivia',group:'Americas'},
+  {code:'PY',flag:'🇵🇾',name:'Paraguay',group:'Americas'},
+  {code:'UY',flag:'🇺🇾',name:'Uruguay',group:'Americas'},
+  {code:'GT',flag:'🇬🇹',name:'Guatemala',group:'Americas'},
+  {code:'CR',flag:'🇨🇷',name:'Costa Rica',group:'Americas'},
+  {code:'PA',flag:'🇵🇦',name:'Panama',group:'Americas'},
+  {code:'DO',flag:'🇩🇴',name:'Dominican Rep.',group:'Americas'},
+  {code:'JM',flag:'🇯🇲',name:'Jamaica',group:'Americas'},
+  {code:'TT',flag:'🇹🇹',name:'Trinidad',group:'Americas'},
+  {code:'GB',flag:'🇬🇧',name:'United Kingdom',group:'Europe'},
+  {code:'DE',flag:'🇩🇪',name:'Germany',group:'Europe'},
+  {code:'FR',flag:'🇫🇷',name:'France',group:'Europe'},
+  {code:'IT',flag:'🇮🇹',name:'Italy',group:'Europe'},
+  {code:'ES',flag:'🇪🇸',name:'Spain',group:'Europe'},
+  {code:'NL',flag:'🇳🇱',name:'Netherlands',group:'Europe'},
+  {code:'PL',flag:'🇵🇱',name:'Poland',group:'Europe'},
+  {code:'PT',flag:'🇵🇹',name:'Portugal',group:'Europe'},
+  {code:'SE',flag:'🇸🇪',name:'Sweden',group:'Europe'},
+  {code:'NO',flag:'🇳🇴',name:'Norway',group:'Europe'},
+  {code:'DK',flag:'🇩🇰',name:'Denmark',group:'Europe'},
+  {code:'FI',flag:'🇫🇮',name:'Finland',group:'Europe'},
+  {code:'BE',flag:'🇧🇪',name:'Belgium',group:'Europe'},
+  {code:'CH',flag:'🇨🇭',name:'Switzerland',group:'Europe'},
+  {code:'AT',flag:'🇦🇹',name:'Austria',group:'Europe'},
+  {code:'CZ',flag:'🇨🇿',name:'Czech Republic',group:'Europe'},
+  {code:'HU',flag:'🇭🇺',name:'Hungary',group:'Europe'},
+  {code:'RO',flag:'🇷🇴',name:'Romania',group:'Europe'},
+  {code:'GR',flag:'🇬🇷',name:'Greece',group:'Europe'},
+  {code:'BG',flag:'🇧🇬',name:'Bulgaria',group:'Europe'},
+  {code:'HR',flag:'🇭🇷',name:'Croatia',group:'Europe'},
+  {code:'SK',flag:'🇸🇰',name:'Slovakia',group:'Europe'},
+  {code:'SI',flag:'🇸🇮',name:'Slovenia',group:'Europe'},
+  {code:'LT',flag:'🇱🇹',name:'Lithuania',group:'Europe'},
+  {code:'LV',flag:'🇱🇻',name:'Latvia',group:'Europe'},
+  {code:'EE',flag:'🇪🇪',name:'Estonia',group:'Europe'},
+  {code:'IE',flag:'🇮🇪',name:'Ireland',group:'Europe'},
+  {code:'IS',flag:'🇮🇸',name:'Iceland',group:'Europe'},
+  {code:'MT',flag:'🇲🇹',name:'Malta',group:'Europe'},
+  {code:'CY',flag:'🇨🇾',name:'Cyprus',group:'Europe'},
+  {code:'LU',flag:'🇱🇺',name:'Luxembourg',group:'Europe'},
+  {code:'AL',flag:'🇦🇱',name:'Albania',group:'Europe'},
+  {code:'RS',flag:'🇷🇸',name:'Serbia',group:'Europe'},
+  {code:'MK',flag:'🇲🇰',name:'N. Macedonia',group:'Europe'},
+  {code:'BA',flag:'🇧🇦',name:'Bosnia',group:'Europe'},
+  {code:'ME',flag:'🇲🇪',name:'Montenegro',group:'Europe'},
+  {code:'IN',flag:'🇮🇳',name:'India',group:'Asia-Pacific'},
+  {code:'JP',flag:'🇯🇵',name:'Japan',group:'Asia-Pacific'},
+  {code:'KR',flag:'🇰🇷',name:'South Korea',group:'Asia-Pacific'},
+  {code:'AU',flag:'🇦🇺',name:'Australia',group:'Asia-Pacific'},
+  {code:'NZ',flag:'🇳🇿',name:'New Zealand',group:'Asia-Pacific'},
+  {code:'SG',flag:'🇸🇬',name:'Singapore',group:'Asia-Pacific'},
+  {code:'ID',flag:'🇮🇩',name:'Indonesia',group:'Asia-Pacific'},
+  {code:'PH',flag:'🇵🇭',name:'Philippines',group:'Asia-Pacific'},
+  {code:'TH',flag:'🇹🇭',name:'Thailand',group:'Asia-Pacific'},
+  {code:'MY',flag:'🇲🇾',name:'Malaysia',group:'Asia-Pacific'},
+  {code:'VN',flag:'🇻🇳',name:'Vietnam',group:'Asia-Pacific'},
+  {code:'BD',flag:'🇧🇩',name:'Bangladesh',group:'Asia-Pacific'},
+  {code:'PK',flag:'🇵🇰',name:'Pakistan',group:'Asia-Pacific'},
+  {code:'LK',flag:'🇱🇰',name:'Sri Lanka',group:'Asia-Pacific'},
+  {code:'NP',flag:'🇳🇵',name:'Nepal',group:'Asia-Pacific'},
+  {code:'KH',flag:'🇰🇭',name:'Cambodia',group:'Asia-Pacific'},
+  {code:'MM',flag:'🇲🇲',name:'Myanmar',group:'Asia-Pacific'},
+  {code:'TW',flag:'🇹🇼',name:'Taiwan',group:'Asia-Pacific'},
+  {code:'HK',flag:'🇭🇰',name:'Hong Kong',group:'Asia-Pacific'},
+  {code:'PG',flag:'🇵🇬',name:'Papua New Guinea',group:'Asia-Pacific'},
+  {code:'FJ',flag:'🇫🇯',name:'Fiji',group:'Asia-Pacific'},
+  {code:'SA',flag:'🇸🇦',name:'Saudi Arabia',group:'Middle East'},
+  {code:'AE',flag:'🇦🇪',name:'UAE',group:'Middle East'},
+  {code:'TR',flag:'🇹🇷',name:'Turkey',group:'Middle East'},
+  {code:'IL',flag:'🇮🇱',name:'Israel',group:'Middle East'},
+  {code:'JO',flag:'🇯🇴',name:'Jordan',group:'Middle East'},
+  {code:'LB',flag:'🇱🇧',name:'Lebanon',group:'Middle East'},
+  {code:'QA',flag:'🇶🇦',name:'Qatar',group:'Middle East'},
+  {code:'KW',flag:'🇰🇼',name:'Kuwait',group:'Middle East'},
+  {code:'BH',flag:'🇧🇭',name:'Bahrain',group:'Middle East'},
+  {code:'OM',flag:'🇴🇲',name:'Oman',group:'Middle East'},
+  {code:'IQ',flag:'🇮🇶',name:'Iraq',group:'Middle East'},
+  {code:'EG',flag:'🇪🇬',name:'Egypt',group:'Middle East'},
+  {code:'AZ',flag:'🇦🇿',name:'Azerbaijan',group:'Middle East'},
+  {code:'GE',flag:'🇬🇪',name:'Georgia',group:'Middle East'},
+  {code:'AM',flag:'🇦🇲',name:'Armenia',group:'Middle East'},
+  {code:'KZ',flag:'🇰🇿',name:'Kazakhstan',group:'Middle East'},
+  {code:'UZ',flag:'🇺🇿',name:'Uzbekistan',group:'Middle East'},
+  {code:'NG',flag:'🇳🇬',name:'Nigeria',group:'Africa'},
+  {code:'ZA',flag:'🇿🇦',name:'South Africa',group:'Africa'},
+  {code:'KE',flag:'🇰🇪',name:'Kenya',group:'Africa'},
+  {code:'GH',flag:'🇬🇭',name:'Ghana',group:'Africa'},
+  {code:'TZ',flag:'🇹🇿',name:'Tanzania',group:'Africa'},
+  {code:'UG',flag:'🇺🇬',name:'Uganda',group:'Africa'},
+  {code:'ZM',flag:'🇿🇲',name:'Zambia',group:'Africa'},
+  {code:'ZW',flag:'🇿🇼',name:'Zimbabwe',group:'Africa'},
+  {code:'CM',flag:'🇨🇲',name:'Cameroon',group:'Africa'},
+  {code:'SN',flag:'🇸🇳',name:'Senegal',group:'Africa'},
+  {code:'CI',flag:'🇨🇮',name:"Cote d'Ivoire",group:'Africa'},
+  {code:'ET',flag:'🇪🇹',name:'Ethiopia',group:'Africa'},
+  {code:'RW',flag:'🇷🇼',name:'Rwanda',group:'Africa'},
+  {code:'MZ',flag:'🇲🇿',name:'Mozambique',group:'Africa'},
+  {code:'MA',flag:'🇲🇦',name:'Morocco',group:'Africa'},
+  {code:'TN',flag:'🇹🇳',name:'Tunisia',group:'Africa'},
+  {code:'DZ',flag:'🇩🇿',name:'Algeria',group:'Africa'},
+  {code:'AO',flag:'🇦🇴',name:'Angola',group:'Africa'},
+];
+
+let _playerCountry = { code:'', flag:'' };
+
+function loadSavedCountry(){
+  try{ const s=JSON.parse(localStorage.getItem(COUNTRY_KEY)||'null'); if(s&&s.code) _playerCountry=s; }catch(_){}
+}
+
+function saveCountryToLocal(code,flag){
+  _playerCountry={code,flag};
+  localStorage.setItem(COUNTRY_KEY,JSON.stringify({code,flag}));
+}
+
+function buildCountryPicker(filter){
+  const scroll=document.getElementById('countryPickerScroll');
+  if(!scroll) return;
+  const q=(filter||'').toLowerCase().trim();
+  const filtered=q ? COUNTRIES.filter(c=>c.name.toLowerCase().includes(q)||c.code.toLowerCase().includes(q)) : COUNTRIES;
+  if(!filtered.length){ scroll.innerHTML=`<div class="cp-empty">No results for "${escHtml(q)}"</div>`; return; }
+  let html='', lastGroup='';
+  filtered.forEach(c=>{
+    if(!q&&c.group!==lastGroup){ html+=`<div class="cp-group">${escHtml(c.group)}</div>`; lastGroup=c.group; }
+    const sel=_playerCountry.code===c.code;
+    html+=`<div class="cp-row${sel?' selected':''}" data-code="${escHtml(c.code)}" data-flag="${escHtml(c.flag)}" data-name="${escHtml(c.name)}">
+      <span class="cp-flag">${c.flag}</span>
+      <span class="cp-name">${escHtml(c.name)}</span>
+      ${sel?'<span class="cp-tick">✓</span>':''}
+    </div>`;
+  });
+  scroll.innerHTML=html;
+  scroll.querySelectorAll('.cp-row').forEach(row=>{
+    row.addEventListener('click',()=>{
+      saveCountryToLocal(row.dataset.code,row.dataset.flag);
+      SFX.click();
+      buildCountryPicker(document.getElementById('countrySearch')?.value||'');
+      showCountrySelected(row.dataset.flag,row.dataset.name);
+    });
+  });
+}
+
+function showCountrySelected(flag,name){
+  const wrap=document.getElementById('countrySelectedWrap');
+  const chip=document.getElementById('countrySelectedChip');
+  if(wrap) wrap.style.display='flex';
+  if(chip) chip.textContent=`${flag}  ${name}`;
+  const sw=document.querySelector('.country-search-wrap');
+  if(sw) sw.style.display='none';
+  const scroll=document.getElementById('countryPickerScroll');
+  if(scroll) scroll.style.display='none';
+}
+
 function showOnboardCountries(){
   document.getElementById('onboardNameModal').style.display='none';
   document.getElementById('onboardCountriesModal').style.display='flex';
+  if(_playerCountry.code){
+    const c=COUNTRIES.find(x=>x.code===_playerCountry.code);
+    if(c){ showCountrySelected(c.flag,c.name); return; }
+  }
+  buildCountryPicker('');
 }
 
 function finishOnboarding(){
@@ -1638,7 +1823,24 @@ function finishOnboarding(){
   if(overlay) overlay.style.display='flex';
 }
 
-// ── Wire onboarding buttons ────────────────────
+// Wire country picker
+document.getElementById('countrySearch')?.addEventListener('input',e=>buildCountryPicker(e.target.value));
+
+document.getElementById('countryChangeBtn')?.addEventListener('click',()=>{
+  const wrap=document.getElementById('countrySelectedWrap');
+  if(wrap) wrap.style.display='none';
+  const sw=document.querySelector('.country-search-wrap');
+  if(sw) sw.style.display='block';
+  const scroll=document.getElementById('countryPickerScroll');
+  if(scroll) scroll.style.display='block';
+  buildCountryPicker('');
+  document.getElementById('countrySearch')?.focus();
+});
+
+document.getElementById('countrySkipLink')?.addEventListener('click',e=>{e.preventDefault();SFX.click();finishOnboarding();});
+document.getElementById('onboardCountriesNextBtn')?.addEventListener('click',()=>{SFX.click();finishOnboarding();});
+
+// ── Wire demo + name onboarding buttons ────────
 document.getElementById('onboardDemoNextBtn')?.addEventListener('click',()=>{
   SFX.click(); stopOnboardDemo();
   document.getElementById('onboardDemoModal').style.display='none';
@@ -1648,7 +1850,6 @@ document.getElementById('onboardDemoNextBtn')?.addEventListener('click',()=>{
 
 document.getElementById('onboardNameNextBtn')?.addEventListener('click',()=>{ SFX.click(); submitOnboardName(); });
 document.getElementById('onboardNameInput')?.addEventListener('keydown',e=>{ if(e.key==='Enter'){ SFX.click(); submitOnboardName(); } });
-document.getElementById('onboardCountriesNextBtn')?.addEventListener('click',()=>{ SFX.click(); finishOnboarding(); });
 
 // ── Main onboarding entry point ─────────────────
 function startOnboarding(){

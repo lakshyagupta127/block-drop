@@ -410,7 +410,7 @@
     </div>
   </div>
 
-  <!-- ── ONBOARDING STEP 3: Legal Countries ── -->
+  <!-- ── ONBOARDING STEP 3: Country Picker ── -->
   <div id="onboardCountriesModal" class="modal-overlay onboard-overlay" style="display:none">
     <div class="onboard-modal onboard-countries-modal">
 
@@ -420,155 +420,38 @@
           <div class="onboard-dot done"></div>
           <div class="onboard-dot active"></div>
         </div>
-        <h2 class="onboard-title">Available In</h2>
-        <p class="onboard-sub">Block Drop is legally available on Google Play in these countries</p>
+        <h2 class="onboard-title">Where are you from?</h2>
+        <p class="onboard-sub">Select your country — your flag will appear next to your name on the leaderboard.</p>
       </div>
 
-      <!-- Scrollable flag grid -->
-      <div class="countries-scroll-wrap">
-        <div class="countries-grid">
-          <!-- Americas -->
-          <div class="country-group-label">Americas</div>
-          <div class="country-chip">🇺🇸 USA</div>
-          <div class="country-chip">🇧🇷 Brazil</div>
-          <div class="country-chip">🇨🇦 Canada</div>
-          <div class="country-chip">🇲🇽 Mexico</div>
-          <div class="country-chip">🇦🇷 Argentina</div>
-          <div class="country-chip">🇨🇴 Colombia</div>
-          <div class="country-chip">🇨🇱 Chile</div>
-          <div class="country-chip">🇵🇪 Peru</div>
-          <div class="country-chip">🇻🇪 Venezuela</div>
-          <div class="country-chip">🇪🇨 Ecuador</div>
-          <div class="country-chip">🇧🇴 Bolivia</div>
-          <div class="country-chip">🇵🇾 Paraguay</div>
-          <div class="country-chip">🇺🇾 Uruguay</div>
-          <div class="country-chip">🇬🇹 Guatemala</div>
-          <div class="country-chip">🇨🇷 Costa Rica</div>
-          <div class="country-chip">🇵🇦 Panama</div>
-          <div class="country-chip">🇩🇴 Dominican Rep.</div>
-          <div class="country-chip">🇯🇲 Jamaica</div>
-          <div class="country-chip">🇹🇹 Trinidad</div>
-          <div class="country-chip">🇧🇧 Barbados</div>
+      <!-- Selected country display -->
+      <div class="country-selected-wrap" id="countrySelectedWrap" style="display:none">
+        <div class="country-selected-chip" id="countrySelectedChip"></div>
+        <button class="country-change-btn" id="countryChangeBtn">Change</button>
+      </div>
 
-          <!-- Europe -->
-          <div class="country-group-label">Europe</div>
-          <div class="country-chip">🇬🇧 UK</div>
-          <div class="country-chip">🇩🇪 Germany</div>
-          <div class="country-chip">🇫🇷 France</div>
-          <div class="country-chip">🇮🇹 Italy</div>
-          <div class="country-chip">🇪🇸 Spain</div>
-          <div class="country-chip">🇳🇱 Netherlands</div>
-          <div class="country-chip">🇵🇱 Poland</div>
-          <div class="country-chip">🇵🇹 Portugal</div>
-          <div class="country-chip">🇸🇪 Sweden</div>
-          <div class="country-chip">🇳🇴 Norway</div>
-          <div class="country-chip">🇩🇰 Denmark</div>
-          <div class="country-chip">🇫🇮 Finland</div>
-          <div class="country-chip">🇧🇪 Belgium</div>
-          <div class="country-chip">🇨🇭 Switzerland</div>
-          <div class="country-chip">🇦🇹 Austria</div>
-          <div class="country-chip">🇨🇿 Czech Rep.</div>
-          <div class="country-chip">🇭🇺 Hungary</div>
-          <div class="country-chip">🇷🇴 Romania</div>
-          <div class="country-chip">🇬🇷 Greece</div>
-          <div class="country-chip">🇧🇬 Bulgaria</div>
-          <div class="country-chip">🇭🇷 Croatia</div>
-          <div class="country-chip">🇸🇰 Slovakia</div>
-          <div class="country-chip">🇸🇮 Slovenia</div>
-          <div class="country-chip">🇱🇹 Lithuania</div>
-          <div class="country-chip">🇱🇻 Latvia</div>
-          <div class="country-chip">🇪🇪 Estonia</div>
-          <div class="country-chip">🇮🇪 Ireland</div>
-          <div class="country-chip">🇮🇸 Iceland</div>
-          <div class="country-chip">🇲🇹 Malta</div>
-          <div class="country-chip">🇨🇾 Cyprus</div>
-          <div class="country-chip">🇱🇺 Luxembourg</div>
-          <div class="country-chip">🇦🇱 Albania</div>
-          <div class="country-chip">🇷🇸 Serbia</div>
-          <div class="country-chip">🇲🇰 N. Macedonia</div>
-          <div class="country-chip">🇧🇦 Bosnia</div>
-          <div class="country-chip">🇲🇪 Montenegro</div>
+      <!-- Search box -->
+      <div class="country-search-wrap">
+        <input
+          type="text"
+          id="countrySearch"
+          class="country-search-input"
+          placeholder="🔍  Search your country…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
 
-          <!-- Asia-Pacific -->
-          <div class="country-group-label">Asia-Pacific</div>
-          <div class="country-chip">🇮🇳 India</div>
-          <div class="country-chip">🇯🇵 Japan</div>
-          <div class="country-chip">🇰🇷 South Korea</div>
-          <div class="country-chip">🇦🇺 Australia</div>
-          <div class="country-chip">🇳🇿 New Zealand</div>
-          <div class="country-chip">🇸🇬 Singapore</div>
-          <div class="country-chip">🇮🇩 Indonesia</div>
-          <div class="country-chip">🇵🇭 Philippines</div>
-          <div class="country-chip">🇹🇭 Thailand</div>
-          <div class="country-chip">🇲🇾 Malaysia</div>
-          <div class="country-chip">🇻🇳 Vietnam</div>
-          <div class="country-chip">🇧🇩 Bangladesh</div>
-          <div class="country-chip">🇵🇰 Pakistan</div>
-          <div class="country-chip">🇱🇰 Sri Lanka</div>
-          <div class="country-chip">🇳🇵 Nepal</div>
-          <div class="country-chip">🇰🇭 Cambodia</div>
-          <div class="country-chip">🇲🇲 Myanmar</div>
-          <div class="country-chip">🇹🇼 Taiwan</div>
-          <div class="country-chip">🇭🇰 Hong Kong</div>
-          <div class="country-chip">🇲🇴 Macau</div>
-          <div class="country-chip">🇵🇬 Papua NG</div>
-          <div class="country-chip">🇫🇯 Fiji</div>
-
-          <!-- Middle East & Central Asia -->
-          <div class="country-group-label">Middle East</div>
-          <div class="country-chip">🇸🇦 Saudi Arabia</div>
-          <div class="country-chip">🇦🇪 UAE</div>
-          <div class="country-chip">🇹🇷 Turkey</div>
-          <div class="country-chip">🇮🇱 Israel</div>
-          <div class="country-chip">🇯🇴 Jordan</div>
-          <div class="country-chip">🇱🇧 Lebanon</div>
-          <div class="country-chip">🇶🇦 Qatar</div>
-          <div class="country-chip">🇰🇼 Kuwait</div>
-          <div class="country-chip">🇧🇭 Bahrain</div>
-          <div class="country-chip">🇴🇲 Oman</div>
-          <div class="country-chip">🇮🇶 Iraq</div>
-          <div class="country-chip">🇪🇬 Egypt</div>
-          <div class="country-chip">🇦🇿 Azerbaijan</div>
-          <div class="country-chip">🇬🇪 Georgia</div>
-          <div class="country-chip">🇦🇲 Armenia</div>
-          <div class="country-chip">🇰🇿 Kazakhstan</div>
-          <div class="country-chip">🇺🇿 Uzbekistan</div>
-
-          <!-- Africa -->
-          <div class="country-group-label">Africa</div>
-          <div class="country-chip">🇳🇬 Nigeria</div>
-          <div class="country-chip">🇿🇦 South Africa</div>
-          <div class="country-chip">🇰🇪 Kenya</div>
-          <div class="country-chip">🇬🇭 Ghana</div>
-          <div class="country-chip">🇹🇿 Tanzania</div>
-          <div class="country-chip">🇺🇬 Uganda</div>
-          <div class="country-chip">🇿🇲 Zambia</div>
-          <div class="country-chip">🇿🇼 Zimbabwe</div>
-          <div class="country-chip">🇨🇲 Cameroon</div>
-          <div class="country-chip">🇸🇳 Senegal</div>
-          <div class="country-chip">🇨🇮 Côte d'Ivoire</div>
-          <div class="country-chip">🇪🇹 Ethiopia</div>
-          <div class="country-chip">🇷🇼 Rwanda</div>
-          <div class="country-chip">🇲🇿 Mozambique</div>
-          <div class="country-chip">🇲🇦 Morocco</div>
-          <div class="country-chip">🇹🇳 Tunisia</div>
-          <div class="country-chip">🇩🇿 Algeria</div>
-          <div class="country-chip">🇦🇴 Angola</div>
-
-          <!-- Not available -->
-          <div class="country-group-label not-available-label">Not Available</div>
-          <div class="country-chip country-chip-blocked">🚫 China</div>
-          <div class="country-chip country-chip-blocked">🚫 Russia</div>
-          <div class="country-chip country-chip-blocked">🚫 North Korea</div>
-          <div class="country-chip country-chip-blocked">🚫 Iran</div>
-          <div class="country-chip country-chip-blocked">🚫 Cuba</div>
-          <div class="country-chip country-chip-blocked">🚫 Syria</div>
-        </div>
+      <!-- Scrollable country list -->
+      <div class="country-picker-scroll" id="countryPickerScroll">
+        <!-- Populated by JS from COUNTRIES array -->
       </div>
 
       <button class="onboard-next-btn onboard-play-btn" id="onboardCountriesNextBtn">
         ▶ Start Playing!
       </button>
+      <p class="country-skip-note" id="countrySkipNote">or <a href="#" id="countrySkipLink">skip — play without a flag</a></p>
+
     </div>
   </div>
 
