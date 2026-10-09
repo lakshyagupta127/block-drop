@@ -688,25 +688,15 @@ function togglePause() {
 }
 
 function syncPauseBtn() {
-  const btn=document.getElementById('btnPauseMob');
   const topBtn=document.getElementById('pauseBtn');
-  if(!btn) return;
   if(paused){
-    btn.classList.add('is-paused');
-    btn.innerHTML='▶ <span class="pause-label">Resume</span>';
     if(topBtn) topBtn.textContent='▶';
   } else {
-    btn.classList.remove('is-paused');
-    btn.innerHTML='⏸ <span class="pause-label">Pause</span>';
     if(topBtn) topBtn.textContent='⏸';
   }
 }
 
 function syncControlButtons() {
-  const pauseBtn=document.getElementById('btnPauseMob');
-  if(!pauseBtn) return;
-  pauseBtn.style.flex='1';
-  if(!gameRunning) syncPauseBtn();
 }
 
 // ── Leaderboard ────────────────────────────────
@@ -905,7 +895,6 @@ function bindTouchBtnPause(id,action){
   el.addEventListener('touchstart',fire,{passive:false});
   el.addEventListener('mousedown',fire);
 }
-bindTouchBtnPause('btnPauseMob',()=>{ if(!gameRunning) return; togglePause(); });
 document.getElementById('pauseBtn')?.addEventListener('click',()=>{ SFX.click(); if(!gameRunning) return; togglePause(); });
 
 // ── Volume & Music Controller ──────────────────
