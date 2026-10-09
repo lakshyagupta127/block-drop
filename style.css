@@ -21,7 +21,7 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: 'Courier New', monospace;
-  overflow-x: hidden;
+  overflow: hidden;
   touch-action: manipulation;
 }
 
@@ -449,11 +449,12 @@ html, body {
     justify-content: center;
   }
 
-  /* Canvas scales to fit the screen width perfectly */
+  /* Canvas scales to fit the screen width, but shrinks if screen is too short */
   #gameCanvas {
     width: 100vw;
     max-width: min(360px, 100vw);
     height: auto;
+    max-height: calc(100vh - 180px); /* Leave room for top bar and touch controls */
     aspect-ratio: 1 / 2;
   }
 
