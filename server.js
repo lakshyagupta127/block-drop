@@ -237,11 +237,15 @@ app.get('/api/scores', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 10, 100);
     const { rows } = await query(
-      `SELECT id, name, score, level, lines, country_code, country_flag, created_at
-       FROM scores ORDER BY score DESC LIMIT $1`,
+      `SELECT * FROM (
+         SELECT DISTINCT ON (name) id, name, score, level, lines, country_code, country_flag, created_at
+         FROM scores
+         ORDER BY name, score DESC
+       ) best_scores
+       ORDER BY score DESC LIMIT $1`,
       [limit]
     );
-    const total = (await query('SELECT COUNT(*) AS total FROM scores')).rows[0].total;
+    const total = (await query('SELECT COUNT(DISTINCT name) AS total FROM scores')).rows[0].total;
     res.json({ success: true, scores: rows, total: parseInt(total) });
   } catch (err) {
     console.error('GET /api/scores:', err.message);
