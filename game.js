@@ -682,7 +682,7 @@ function togglePause() {
     ctx.fillStyle='#fff'; ctx.font='bold 28px Courier New';
     ctx.textAlign='center'; ctx.fillText('PAUSED',canvas.width/2,canvas.height/2);
     ctx.font='13px Courier New'; ctx.fillStyle='#aaa';
-    ctx.fillText('Tap ⏸ or P to resume',canvas.width/2,canvas.height/2+32);
+    ctx.fillText('Tap Play at the top or P to resume',canvas.width/2,canvas.height/2+32);
   }
   syncPauseBtn();
 }
