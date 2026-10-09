@@ -38,6 +38,20 @@ const scoreEls = ['scoreDisplay','scoreDisplay2'].map(id=>document.getElementByI
 const levelEls = ['levelDisplay','levelDisplay2'].map(id=>document.getElementById(id)).filter(Boolean);
 const linesEls = ['linesDisplay','linesDisplay2'].map(id=>document.getElementById(id)).filter(Boolean);
 
+// Apply High-DPI scaling to fix blurry rendering on mobile
+function applyHighDPI() {
+  const dpr = window.devicePixelRatio || 1;
+  document.querySelectorAll('canvas').forEach(cvs => {
+    const w = parseInt(cvs.getAttribute('width'));
+    const h = parseInt(cvs.getAttribute('height'));
+    if(!w || !h) return;
+    cvs.width = w * dpr;
+    cvs.height = h * dpr;
+    cvs.getContext('2d').scale(dpr, dpr);
+  });
+}
+applyHighDPI();
+
 // ── Audio ──────────────────────────────────────
 let audioCtx = null;
 function getAudio() {
@@ -423,7 +437,7 @@ function fxLineClear(rows, count) {
   rows.forEach(row => {
     const y = row * BLOCK + BLOCK / 2;
     for (let i = 0; i < 18; i++) {
-      const x  = Math.random() * canvas.width;
+      const x  = Math.random() * 300;
       const hue= Math.floor(Math.random() * 360);
       _fxParticles.push({
         x, y,
@@ -439,16 +453,16 @@ function fxLineClear(rows, count) {
   });
 
   // 2. Flash: draw white/cyan strips over cleared rows
-  fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+  fxCtx.clearRect(0, 0, 300, 600);
   rows.forEach(row => {
     const y = row * BLOCK;
     fxCtx.fillStyle = count === 4 ? 'rgba(255,220,0,0.85)' : 'rgba(0,240,240,0.75)';
-    fxCtx.fillRect(0, y, canvas.width, BLOCK);
+    fxCtx.fillRect(0, y, 300, BLOCK);
   });
 
   // Flash fades in 120ms
   setTimeout(() => {
-    fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+    fxCtx.clearRect(0, 0, 300, 600);
   }, 120);
 
   // 3. Show score popup
@@ -463,7 +477,7 @@ function fxLineClear(rows, count) {
 
 function fxLoop() {
   if (!fxCtx) return;
-  fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+  fxCtx.clearRect(0, 0, 300, 600);
 
   _fxParticles = _fxParticles.filter(p => p.life > 0);
 
@@ -491,7 +505,7 @@ function fxLoop() {
     _fxRaf = requestAnimationFrame(fxLoop);
   } else {
     _fxRaf = null;
-    fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+    fxCtx.clearRect(0, 0, 300, 600);
   }
 }
 
@@ -558,7 +572,7 @@ function ghostY() {
 
 function drawBoard() {
   ctx.fillStyle='#0a0a18';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillRect(0,0,300,600);
   ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=0.5;
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) ctx.strokeRect(c*BLOCK,r*BLOCK,BLOCK,BLOCK);
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(board[r][c]) drawBlock(ctx,c,r,board[r][c]);
@@ -678,11 +692,11 @@ function togglePause() {
   if(!gameRunning) return;
   paused=!paused; SFX.click();
   if(paused){
-    ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,300,600);
     ctx.fillStyle='#fff'; ctx.font='bold 28px Courier New';
-    ctx.textAlign='center'; ctx.fillText('PAUSED',canvas.width/2,canvas.height/2);
+    ctx.textAlign='center'; ctx.fillText('PAUSED',300/2,600/2);
     ctx.font='13px Courier New'; ctx.fillStyle='#aaa';
-    ctx.fillText('Tap Play at the top or P to resume',canvas.width/2,canvas.height/2+32);
+    ctx.fillText('Tap Play at the top or P to resume',300/2,600/2+32);
   }
   syncPauseBtn();
 }
