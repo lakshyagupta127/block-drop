@@ -136,32 +136,22 @@
 
   </div>
 
-  <!-- ── Mobile touch controls (Matching Cyber Banana D-pad & Drop Layout) ── -->
+  <!-- ── Mobile touch controls ── -->
   <div class="touch-controls mobile-only">
-    <div class="touch-controls-cluster">
 
-      <!-- Left: D-pad Keycap Cluster -->
-      <div class="dpad-cluster">
-        <div class="dpad-top-row">
-          <button class="t-btn cyber-key" id="btnRotate" aria-label="Rotate">↑</button>
-        </div>
-        <div class="dpad-bottom-row">
-          <button class="t-btn cyber-key" id="btnLeft" aria-label="Move Left">←</button>
-          <button class="t-btn cyber-key" id="btnRight" aria-label="Move Right">→</button>
-          <button class="t-btn cyber-key" id="btnRotate2" aria-label="Rotate">↑</button>
-          <button class="t-btn cyber-key" id="btnDown" aria-label="Soft Drop">↓</button>
-        </div>
-      </div>
-
-      <!-- Right: Big DROP strike key -->
-      <div class="drop-cluster">
-        <button class="t-btn cyber-drop-key" id="btnDrop" aria-label="Hard Drop">
-          <span class="drop-key-icon">⮋</span>
-          <span class="drop-key-label">DROP</span>
-        </button>
-      </div>
-
+    <!-- Row 1: Move + Rotate -->
+    <div class="touch-row">
+      <button class="t-btn" id="btnLeft" aria-label="Move Left">◀</button>
+      <button class="t-btn rotate-btn" id="btnRotate" aria-label="Rotate">↻</button>
+      <button class="t-btn" id="btnRight" aria-label="Move Right">▶</button>
     </div>
+
+    <!-- Row 2: Drop buttons -->
+    <div class="touch-row">
+      <button class="t-btn wide-btn" id="btnDown" aria-label="Soft Drop">▼ <span data-i18n="soft_drop">Soft drop</span></button>
+      <button class="t-btn wide-btn drop-btn" id="btnDrop" aria-label="Hard Drop">⬇ <span data-i18n="hard_drop">Hard drop</span></button>
+    </div>
+
   </div>
 
   <!-- ── Leaderboard Modal ── -->

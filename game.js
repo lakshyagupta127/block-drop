@@ -581,34 +581,29 @@ function drawCyberBlock(context,bx,by,color,alpha,bSize){
   context.globalAlpha=alpha;
   const pad=1.5;
   const size=bSize-pad*2;
-  const rad=3.5;
   const x=bx+pad, y=by+pad;
 
-  // Dark glassy core
+  // Dark glassy core (straight square corners)
   context.fillStyle='rgba(8, 12, 22, 0.78)';
-  if(context.roundRect){ context.beginPath(); context.roundRect(x,y,size,size,rad); context.fill(); }
-  else { context.fillRect(x,y,size,size); }
+  context.fillRect(x,y,size,size);
 
-  // Neon translucent tint
+  // Neon translucent tint (straight square corners)
   context.fillStyle=color;
   context.globalAlpha=alpha*0.38;
-  if(context.roundRect){ context.beginPath(); context.roundRect(x,y,size,size,rad); context.fill(); }
-  else { context.fillRect(x,y,size,size); }
+  context.fillRect(x,y,size,size);
 
-  // Glowing perimeter neon stroke
+  // Glowing perimeter neon stroke (straight square corners)
   context.globalAlpha=alpha;
   context.strokeStyle=color;
   context.lineWidth=2;
   context.shadowColor=color;
   context.shadowBlur=7;
-  if(context.roundRect){ context.beginPath(); context.roundRect(x,y,size,size,rad); context.stroke(); }
-  else { context.strokeRect(x,y,size,size); }
+  context.strokeRect(x,y,size,size);
 
   // Specular reflection highlight streak
   context.shadowBlur=0;
   context.fillStyle='rgba(255, 255, 255, 0.28)';
-  if(context.roundRect){ context.beginPath(); context.roundRect(x+2,y+2,size-4,3,1.5); context.fill(); }
-  else { context.fillRect(x+2,y+2,size-4,3); }
+  context.fillRect(x+2,y+2,size-4,3);
 
   context.restore();
 }
