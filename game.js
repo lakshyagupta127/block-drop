@@ -210,26 +210,70 @@ function updatePlayerUI() {
   const tagEl = document.getElementById('overlayNameTag');
   if (tagEl) {
     if (_isReturning && _playerName && _playerName !== 'Player') {
-      tagEl.textContent = `👋 Welcome back, ${_playerName}!`;
+      tagEl.innerHTML = `
+        <div class="player-badge-inner">
+          <div class="player-badge-avatar">👤</div>
+          <div class="player-badge-text">
+            <span class="player-badge-sub">Welcome back,</span>
+            <strong class="player-badge-name">${_playerName}!</strong>
+            <span class="player-badge-id">PLAYER ID: ${_playerFp ? _playerFp.slice(0, 10).toUpperCase() : 'BD_77'} | LEVEL ${_bestLevel || 1}</span>
+          </div>
+        </div>`;
       tagEl.className   = 'overlay-name-tag welcome-back';
     } else if (_playerName && _playerName !== 'Player') {
-      tagEl.textContent = `👤 ${_playerName}`;
+      tagEl.innerHTML = `
+        <div class="player-badge-inner">
+          <div class="player-badge-avatar">👤</div>
+          <div class="player-badge-text">
+            <span class="player-badge-sub">Arcade Pilot</span>
+            <strong class="player-badge-name">${_playerName}</strong>
+            <span class="player-badge-id">LEVEL ${_bestLevel || 1}</span>
+          </div>
+        </div>`;
       tagEl.className   = 'overlay-name-tag';
     } else {
-      tagEl.textContent = '';
+      tagEl.innerHTML = `
+        <div class="player-badge-inner guest-badge">
+          <div class="player-badge-avatar">🎮</div>
+          <div class="player-badge-text">
+            <span class="player-badge-sub">Cyber Circuit</span>
+            <strong class="player-badge-name">PILOT READY</strong>
+            <span class="player-badge-id">LEVEL 1</span>
+          </div>
+        </div>`;
+      tagEl.className   = 'overlay-name-tag';
     }
   }
 
   const pbEl = document.getElementById('overlayPersonalBest');
   if (pbEl) {
     if (_personalBest > 0) {
-      let html = `<div class="pb-row">🏅 <strong>Best: ${_personalBest.toLocaleString()}</strong> &nbsp;·&nbsp; Lv.${_bestLevel} &nbsp;·&nbsp; ${_totalGames} game${_totalGames!==1?'s':''}</div>`;
+      let html = `
+        <div class="pb-card-header">
+          <span class="pb-label">HIGH SCORE:</span>
+          <span class="pb-score-val">${_personalBest.toLocaleString()}</span>
+        </div>
+        <div class="pb-stats-grid">
+          <div class="pb-stat-cell"><span class="pb-stat-lbl">GAMES PLAYED:</span><span class="pb-stat-num">${_totalGames}</span></div>
+          <div class="pb-stat-cell"><span class="pb-stat-lbl">TOTAL BLOCKS:</span><span class="pb-stat-num">${_totalLines}</span></div>
+          <div class="pb-stat-cell"><span class="pb-stat-lbl">BEST LEVEL:</span><span class="pb-stat-num">${_bestLevel}</span></div>
+        </div>`;
       if (_lastScore > 0 && _isReturning)
-        html += `<div class="pb-last">🕐 Last: ${_lastScore.toLocaleString()} — Lv.${_lastLevel}, ${_lastLines} lines <span class="pb-ago">${timeAgo(_lastPlayedAt)}</span></div>`;
+        html += `<div class="pb-last">Last: ${_lastScore.toLocaleString()} — Lv.${_lastLevel} <span class="pb-ago">${timeAgo(_lastPlayedAt)}</span></div>`;
       pbEl.innerHTML = html;
       pbEl.style.display = 'block';
     } else {
-      pbEl.style.display = 'none';
+      pbEl.innerHTML = `
+        <div class="pb-card-header">
+          <span class="pb-label">CIRCUIT STATUS:</span>
+          <span class="pb-score-val init-ready">ONLINE</span>
+        </div>
+        <div class="pb-stats-grid">
+          <div class="pb-stat-cell"><span class="pb-stat-lbl">PILOT MODE:</span><span class="pb-stat-num">CLASSIC</span></div>
+          <div class="pb-stat-cell"><span class="pb-stat-lbl">SPEED CURVE:</span><span class="pb-stat-num">DYNAMIC</span></div>
+          <div class="pb-stat-cell"><span class="pb-stat-lbl">SYSTEM LINK:</span><span class="pb-stat-num">READY</span></div>
+        </div>`;
+      pbEl.style.display = 'block';
     }
   }
 
@@ -767,12 +811,18 @@ function returnToMenu() {
   ctx.fillRect(0, 0, 300, 600);
   showOverlay(`
     <div class="overlay-name-tag" id="overlayNameTag"></div>
-    <h2>BLOCK DROP</h2>
+    <div class="menu-title-badge">
+      <div class="menu-circuit-decor left"></div>
+      <h2><span class="logo-block">BLOCK</span> <span class="logo-drop">DROP</span></h2>
+      <div class="menu-circuit-decor right"></div>
+    </div>
     <div class="overlay-personal-best" id="overlayPersonalBest" style="display:none"></div>
-    <p data-i18n="tap_to_start">Tap or press Space to start</p>
-    <button class="retro-btn" id="startBtn" data-i18n="start_game">▶ Start Game</button>
-    <button class="retro-btn secondary" id="overlayLbBtn" data-i18n="leaderboard">🏆 Leaderboard</button>
-    <button class="retro-btn secondary" id="overlaySettingsBtn" data-i18n="settings">⚙️ Settings</button>
+    <p class="menu-sub-hint" data-i18n="tap_to_start">Tap or press Space to start</p>
+    <button class="retro-btn start-game-btn" id="startBtn" data-i18n="start_game">START GAME ▶</button>
+    <div class="overlay-btn-row">
+      <button class="retro-btn secondary" id="overlayLbBtn" data-i18n="leaderboard">🏆 Leaderboard</button>
+      <button class="retro-btn secondary" id="overlaySettingsBtn" data-i18n="settings">⚙️ Settings</button>
+    </div>
   `);
   document.getElementById('startBtn')?.addEventListener('click', startGame);
   document.getElementById('overlayLbBtn')?.addEventListener('click', openLB);
@@ -998,13 +1048,13 @@ bindTouchBtn('btnDrop',  ()=>hardDrop());
 })();
 
 // ── Button wiring ──────────────────────────────
-['leaderboardBtn','leaderboardBtn2','overlayLbBtn'].forEach(id=>document.getElementById(id)?.addEventListener('click',openLB));
+['leaderboardBtn','leaderboardBtn2','overlayLbBtn','menuNavLb'].forEach(id=>document.getElementById(id)?.addEventListener('click',openLB));
 document.getElementById('closeLbBtn')?.addEventListener('click',closeLB);
 document.getElementById('clearLbBtn')?.addEventListener('click',()=>alert('Score management is only available in the admin panel.'));
 document.getElementById('saveScoreBtn')?.addEventListener('click',saveScore);
 document.getElementById('skipScoreBtn')?.addEventListener('click',skipScore);
 document.getElementById('nameInput')?.addEventListener('keydown',e=>{if(e.key==='Enter')saveScore();});
-document.getElementById('startBtn')?.addEventListener('click',startGame);
+['startBtn','menuNavPlay'].forEach(id=>document.getElementById(id)?.addEventListener('click',startGame));
 
 // Touch pause/start
 function bindTouchBtnPause(id,action){
@@ -1139,7 +1189,7 @@ function initVolumeUI(){
 
 function openSettingsAndInit(){ initVolumeUI(); openSettings(); }
 
-['settingsBtnMob','settingsBtn2','overlaySettingsBtn'].forEach(id=>document.getElementById(id)?.addEventListener('click',openSettingsAndInit));
+['settingsBtnMob','settingsBtn2','overlaySettingsBtn','menuNavSettings'].forEach(id=>document.getElementById(id)?.addEventListener('click',openSettingsAndInit));
 document.getElementById('closeSettingsBtn')?.addEventListener('click',closeSettings);
 document.getElementById('saveNameBtn')?.addEventListener('click',saveSettingsName);
 document.getElementById('settingsNameInput')?.addEventListener('keydown',e=>{ if(e.key==='Enter') saveSettingsName(); });
@@ -1201,7 +1251,7 @@ function closeHowToPlay(){
   localStorage.setItem(HTP_KEY,'true');
   if(gameRunning&&paused) togglePause();
 }
-document.getElementById('helpBtn')?.addEventListener('click',openHowToPlay);
+['helpBtn','menuNavGuide'].forEach(id=>document.getElementById(id)?.addEventListener('click',openHowToPlay));
 document.getElementById('closeHowToPlayBtn')?.addEventListener('click',closeHowToPlay);
 document.getElementById('howToPlayModal')?.addEventListener('click',e=>{
   if(e.target===document.getElementById('howToPlayModal')) closeHowToPlay();

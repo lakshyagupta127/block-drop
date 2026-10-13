@@ -11,6 +11,8 @@
   <meta property="og:description" content="A free puzzle game. Rated Everyone / PEGI 3. No ads, no in-app purchases.">
   <meta name="google-play-app" content="app-id=com.yourname.blockdrop">
   <title>Block Drop</title>
+  <link rel="icon" type="image/jpeg" href="/icon.jpg">
+  <link rel="apple-touch-icon" href="/icon.jpg">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="style.css">
 </head>
@@ -93,12 +95,18 @@
 
       <div id="overlay">
         <div class="overlay-name-tag" id="overlayNameTag"></div>
-        <h2>BLOCK DROP</h2>
+        <div class="menu-title-badge">
+          <div class="menu-circuit-decor left"></div>
+          <h2><span class="logo-block">BLOCK</span> <span class="logo-drop">DROP</span></h2>
+          <div class="menu-circuit-decor right"></div>
+        </div>
         <div class="overlay-personal-best" id="overlayPersonalBest" style="display:none"></div>
-        <p data-i18n="tap_to_start">Tap or press Space to start</p>
-        <button class="retro-btn" id="startBtn" data-i18n="start_game">▶ Start Game</button>
-        <button class="retro-btn secondary" id="overlayLbBtn" data-i18n="leaderboard">🏆 Leaderboard</button>
-        <button class="retro-btn secondary" id="overlaySettingsBtn" data-i18n="settings">⚙️ Settings</button>
+        <p class="menu-sub-hint" data-i18n="tap_to_start">Tap or press Space to start</p>
+        <button class="retro-btn start-game-btn" id="startBtn" data-i18n="start_game">START GAME ▶</button>
+        <div class="overlay-btn-row">
+          <button class="retro-btn secondary" id="overlayLbBtn" data-i18n="leaderboard">🏆 Leaderboard</button>
+          <button class="retro-btn secondary" id="overlaySettingsBtn" data-i18n="settings">⚙️ Settings</button>
+        </div>
       </div>
     </div>
 
@@ -153,6 +161,28 @@
     </div>
 
   </div>
+
+  <!-- ── Nano Banana Menu Bottom Bar (Visible on menu screen) ── -->
+  <nav class="menu-bottom-bar" id="menuBottomBar" aria-label="Game Navigation Menu">
+    <div class="menu-bottom-bar-inner">
+      <button class="menu-nav-item active" id="menuNavPlay" title="Play Game">
+        <span class="nav-icon">🎮</span>
+        <span class="nav-label">PLAY</span>
+      </button>
+      <button class="menu-nav-item" id="menuNavLb" title="Leaderboard">
+        <span class="nav-icon">🏆</span>
+        <span class="nav-label">SCORES</span>
+      </button>
+      <button class="menu-nav-item" id="menuNavSettings" title="Settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">SETTINGS</span>
+      </button>
+      <button class="menu-nav-item" id="menuNavGuide" title="How to Play / Guide">
+        <span class="nav-icon">📖</span>
+        <span class="nav-label">GUIDE</span>
+      </button>
+    </div>
+  </nav>
 
   <!-- ── Leaderboard Modal ── -->
   <div id="lbModal" class="modal-overlay" style="display:none">
