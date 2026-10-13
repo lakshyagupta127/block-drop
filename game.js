@@ -672,6 +672,7 @@ function gameLoop(ts) {
 
 // ── Game flow ──────────────────────────────────
 async function startGame() {
+  document.body.classList.remove('in-menu');
   try{ if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume(); }catch(_){}
   board=createBoard(); score=0; level=1; lines=0;
   paused=false; gameRunning=true;
@@ -714,6 +715,7 @@ function togglePause() {
 
 function returnToMenu() {
   SFX.click();
+  document.body.classList.add('in-menu');
   gameRunning = false;
   paused = false;
   _gameToken = null;

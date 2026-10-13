@@ -39,6 +39,23 @@ html, body {
   flex-wrap: wrap;
 }
 
+body.in-menu .top-bar,
+body.in-menu .touch-controls,
+body.in-menu .left-panel,
+body.in-menu .right-panel {
+  display: none !important;
+}
+
+body.in-menu .game-wrapper {
+  height: 100vh;
+  align-items: center;
+  padding: 0 !important;
+}
+
+body.in-menu #gameCanvas {
+  max-height: 92vh;
+}
+
 .stat-pill {
   display: flex;
   flex-direction: column;
