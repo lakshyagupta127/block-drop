@@ -127,8 +127,9 @@ async function getFingerprint() {
 }
 
 // ── Player profile state ───────────────────────
+const PLAYER_NAME_KEY = 'bd_player_name';
 let _playerFp       = null;
-let _playerName     = 'Player';
+let _playerName     = localStorage.getItem(PLAYER_NAME_KEY) || 'Player';
 let _canChangeName  = true;
 let _nextChangeAt   = null;
 let _personalBest   = 0;
@@ -151,7 +152,10 @@ async function loadPlayerProfile() {
     const profileData = await profileRes.json();
     const statsData   = await statsRes.json();
     if (profileData.success) {
-      _playerName    = profileData.name;
+      if (profileData.name && profileData.name !== 'Player') {
+        _playerName = profileData.name;
+        localStorage.setItem(PLAYER_NAME_KEY, _playerName);
+      }
       _canChangeName = profileData.canChangeName;
       _nextChangeAt  = profileData.nextChangeAt;
     }
@@ -292,6 +296,7 @@ async function saveSettingsName() {
     const data = await res.json();
     if (data.success) {
       _playerName=data.name; _canChangeName=data.canChangeName; _nextChangeAt=data.nextChangeAt;
+      localStorage.setItem(PLAYER_NAME_KEY, _playerName);
       updatePlayerUI(); SFX.clear(1);
       const curEl=document.getElementById('settingsCurrentName');
       if (curEl) curEl.textContent=_playerName;
@@ -337,6 +342,7 @@ async function apiFetchScores(limit=10) {
 }
 
 async function apiSaveScore(name, score, level, lines) {
+  if (!_gameToken) await fetchGameToken();
   if (!_gameToken) return { success:false, error:'No game token' };
   try {
     const duration = _gameStartTs ? Math.floor((Date.now()-_gameStartTs)/1000) : 0;
@@ -767,7 +773,9 @@ async function autoSaveScore() {
   // Save silently in background — show game over screen immediately
   const result = await apiSaveScore(name, score, level, lines);
   if (!result.success) console.warn('Score save failed:', result.error);
-  showGameOverOverlay(result.rank || null);
+  if (result.bestScore) _personalBest = Math.max(_personalBest, result.bestScore);
+  else _personalBest = Math.max(_personalBest, score);
+  showGameOverOverlay(result.rank || null, result.bestScore || _personalBest);
 }
 
 // ── Name entry (fallback only — for players with no saved name) ────────
@@ -783,26 +791,37 @@ function showNameEntry() {
 
 async function saveScore() {
   const name = document.getElementById('nameInput').value.trim() || 'Player';
+  if (name !== 'Player') {
+    _playerName = name;
+    localStorage.setItem(PLAYER_NAME_KEY, _playerName);
+  }
   const btn  = document.getElementById('saveScoreBtn');
   btn.disabled = true; btn.textContent = '💾 Saving…';
   const result = await apiSaveScore(name, score, level, lines);
   document.getElementById('nameModal').style.display = 'none';
   SFX.click(); btn.disabled = false; btn.textContent = '💾 Save';
   if (!result.success) console.warn('Score save failed:', result.error);
-  showGameOverOverlay(result.rank || null);
+  if (result.bestScore) _personalBest = Math.max(_personalBest, result.bestScore);
+  else _personalBest = Math.max(_personalBest, score);
+  showGameOverOverlay(result.rank || null, result.bestScore || _personalBest);
 }
 
 function skipScore() {
   _gameToken = null;
   document.getElementById('nameModal').style.display = 'none';
-  SFX.click(); showGameOverOverlay(null);
+  SFX.click(); showGameOverOverlay(null, _personalBest);
 }
 
-function showGameOverOverlay(rank) {
+function showGameOverOverlay(rank, bestScore) {
+  const best = Math.max(bestScore || 0, _personalBest || 0, score);
+  const bestMsg = best > score
+    ? `<p style="color:#ffd700;font-size:13px;margin:2px 0">🏅 Personal Best: <strong>${best.toLocaleString()}</strong></p>`
+    : (score > 0 ? `<p style="color:#00ff88;font-size:13px;margin:2px 0">🎉 <strong>New Personal Best!</strong></p>` : '');
   const rankMsg=rank?`<p>You ranked <strong>#${rank}</strong> on the leaderboard!</p>`:'';
   showOverlay(`
     <h2>GAME OVER</h2>
     <p class="final-score">Score: ${score.toLocaleString()}</p>
+    ${bestMsg}
     <p>Level ${level} &nbsp;·&nbsp; ${lines} lines</p>
     ${rankMsg}
     <button class="retro-btn" id="restartBtn">▶ Play Again</button>
@@ -820,6 +839,7 @@ function showGameOverOverlay(rank) {
           _lastScore=data.lastScore||0;    _lastLevel=data.lastLevel||1;
           _lastLines=data.lastLines||0;    _lastPlayedAt=data.lastPlayedAt||null;
           _isReturning=true;
+          updatePlayerUI();
         }
       }).catch(()=>{});
   }
@@ -1619,6 +1639,7 @@ async function submitOnboardName(){
       const data = await res.json();
       if(data.success){
         _playerName=data.name; _canChangeName=data.canChangeName; _nextChangeAt=data.nextChangeAt;
+        localStorage.setItem(PLAYER_NAME_KEY, _playerName);
         updatePlayerUI();
       } else if(msgEl){
         msgEl.textContent=data.error||'Could not save name.'; msgEl.className='onboard-name-msg error';
@@ -1626,8 +1647,14 @@ async function submitOnboardName(){
       }
     } catch(err){
       // Network error — save name locally and continue
-      _playerName = name; updatePlayerUI();
+      _playerName = name;
+      localStorage.setItem(PLAYER_NAME_KEY, _playerName);
+      updatePlayerUI();
     }
+  } else {
+    _playerName = name;
+    localStorage.setItem(PLAYER_NAME_KEY, _playerName);
+    updatePlayerUI();
   }
 
   btn.textContent='Save Name & Continue →';

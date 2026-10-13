@@ -91,6 +91,7 @@ async function initDB() {
       created_at       TIMESTAMPTZ      DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_players_fp ON players(fingerprint);
+    ALTER TABLE players ADD COLUMN IF NOT EXISTS best_score INTEGER DEFAULT 0;
   `);
   console.log('[DB] Tables ready.');
 }
@@ -104,7 +105,7 @@ function createGameToken() {
 }
 
 const MAX_GAME_MS       = 4 * 60 * 60 * 1000;
-const MAX_SCORE_PER_SEC = 50;
+const MAX_SCORE_PER_SEC = 2500;
 
 function verifyScoreToken(token, score) {
   try {
@@ -116,7 +117,7 @@ function verifyScoreToken(token, score) {
     const elapsed = Date.now() - raw.payload.startTime;
     if (elapsed < 0 || elapsed > MAX_GAME_MS)
       return { ok: false, reason: 'token expired or future-dated' };
-    const maxPossible = Math.ceil((elapsed / 1000) * MAX_SCORE_PER_SEC);
+    const maxPossible = 1000 + Math.ceil((elapsed / 1000) * MAX_SCORE_PER_SEC);
     if (score > maxPossible)
       return { ok: false, reason: `score ${score} impossible in ${Math.floor(elapsed/1000)}s` };
     return { ok: true };
@@ -238,14 +239,14 @@ app.get('/api/scores', async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 10, 100);
     const { rows } = await query(
       `SELECT * FROM (
-         SELECT DISTINCT ON (name) id, name, score, level, lines, country_code, country_flag, created_at
+         SELECT DISTINCT ON (LOWER(name)) id, name, score, level, lines, country_code, country_flag, created_at
          FROM scores
-         ORDER BY name, score DESC
+         ORDER BY LOWER(name), score DESC
        ) best_scores
        ORDER BY score DESC LIMIT $1`,
       [limit]
     );
-    const total = (await query('SELECT COUNT(DISTINCT name) AS total FROM scores')).rows[0].total;
+    const total = (await query('SELECT COUNT(DISTINCT LOWER(name)) AS total FROM scores')).rows[0].total;
     res.json({ success: true, scores: rows, total: parseInt(total) });
   } catch (err) {
     console.error('GET /api/scores:', err.message);
@@ -292,26 +293,74 @@ app.post('/api/scores', scoreLimiter, async (req, res) => {
     const safeCC       = String(country_code || '').slice(0, 5);
     const safeCF       = String(country_flag || '').slice(0, 10);
 
-    const { rows } = await query(
-      `INSERT INTO scores (name, score, level, lines, duration_s, device, country_code, country_flag)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-      [safeName, safeScore, safeLevel, safeLines, safeDuration, safeDevice, safeCC, safeCF]
+    // Check existing best score for this player in scores table
+    const existingRes = await query(
+      `SELECT id, score FROM scores WHERE LOWER(name) = LOWER($1) ORDER BY score DESC`,
+      [safeName]
     );
-    const id = rows[0].id;
 
-    // Also update last session on player row
+    let id;
+    let bestPlayerScore = safeScore;
+
+    if (existingRes.rows.length === 0) {
+      const { rows } = await query(
+        `INSERT INTO scores (name, score, level, lines, duration_s, device, country_code, country_flag)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+        [safeName, safeScore, safeLevel, safeLines, safeDuration, safeDevice, safeCC, safeCF]
+      );
+      id = rows[0].id;
+    } else {
+      id = existingRes.rows[0].id;
+      const prevBest = parseInt(existingRes.rows[0].score) || 0;
+      bestPlayerScore = Math.max(prevBest, safeScore);
+
+      if (safeScore > prevBest) {
+        await query(
+          `UPDATE scores
+           SET name=$1, score=$2, level=$3, lines=$4, duration_s=$5, device=$6,
+               country_code= CASE WHEN $7 <> '' THEN $7 ELSE country_code END,
+               country_flag= CASE WHEN $8 <> '' THEN $8 ELSE country_flag END,
+               created_at=NOW()
+           WHERE id=$9`,
+          [safeName, safeScore, safeLevel, safeLines, safeDuration, safeDevice, safeCC, safeCF, id]
+        );
+      } else if (safeCC || safeCF) {
+        await query(
+          `UPDATE scores
+           SET country_code= CASE WHEN country_code = '' AND $1 <> '' THEN $1 ELSE country_code END,
+               country_flag= CASE WHEN country_flag = '' AND $2 <> '' THEN $2 ELSE country_flag END
+           WHERE id=$3`,
+          [safeCC, safeCF, id]
+        );
+      }
+
+      // Remove any older duplicate rows for this player so only their single best score remains in DB
+      if (existingRes.rows.length > 1) {
+        await query(
+          `DELETE FROM scores WHERE LOWER(name) = LOWER($1) AND id <> $2`,
+          [safeName, id]
+        );
+      }
+    }
+
+    // Update last session and best_score on player row
     await query(
-      `UPDATE players SET last_score=$1, last_level=$2, last_lines=$3, last_played_at=NOW()
-       WHERE name=$4`,
+      `UPDATE players
+       SET best_score=GREATEST(COALESCE(best_score, 0), $1),
+           last_score=$1, last_level=$2, last_lines=$3, last_played_at=NOW()
+       WHERE LOWER(name)=LOWER($4)`,
       [safeScore, safeLevel, safeLines, safeName]
     );
 
-    const rankRes = await query('SELECT COUNT(*) AS rank FROM scores WHERE score > $1', [safeScore]);
-    const rank    = parseInt(rankRes.rows[0].rank) + 1;
+    const rankRes = await query(
+      `SELECT COUNT(DISTINCT LOWER(name)) AS rank FROM scores WHERE score > $1`,
+      [bestPlayerScore]
+    );
+    const rank = parseInt(rankRes.rows[0].rank) + 1;
 
     res.status(201).json({
-      success: true, id, rank,
-      entry: { id, name: safeName, score: safeScore, level: safeLevel, lines: safeLines },
+      success: true, id, rank, bestScore: bestPlayerScore, isNewBest: safeScore >= bestPlayerScore,
+      entry: { id, name: safeName, score: bestPlayerScore, level: safeLevel, lines: safeLines },
     });
   } catch (err) {
     console.error('POST /api/scores:', err.message);
