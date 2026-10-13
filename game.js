@@ -698,11 +698,14 @@ function togglePause() {
   if(!gameRunning) return;
   paused=!paused; SFX.click();
   if(paused){
-    ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,0,300,600);
-    ctx.fillStyle='#fff'; ctx.font='bold 28px Courier New';
-    ctx.textAlign='center'; ctx.fillText('PAUSED',300/2,600/2);
-    ctx.font='13px Courier New'; ctx.fillStyle='#aaa';
-    ctx.fillText('Tap Play at the top or P to resume',300/2,600/2+32);
+    showOverlay(`
+      <h2>PAUSED</h2>
+      <button class="retro-btn" id="resumeBtn">▶ Resume</button>
+    `);
+    document.getElementById('resumeBtn')?.addEventListener('click', togglePause);
+  } else {
+    overlay.style.display='none';
+    lastDrop=performance.now();
   }
   syncPauseBtn();
 }
