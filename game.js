@@ -52,6 +52,22 @@ function applyHighDPI() {
 }
 applyHighDPI();
 
+// Lock orientation to portrait where supported and auto-pause on landscape
+function lockPortrait() {
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      screen.orientation.lock('portrait').catch(() => {});
+    }
+  } catch (_) {}
+}
+lockPortrait();
+document.addEventListener('touchstart', lockPortrait, { once: true, passive: true });
+window.addEventListener('resize', () => {
+  if (window.innerWidth > window.innerHeight && window.innerHeight <= 550) {
+    if (typeof gameRunning !== 'undefined' && gameRunning && !paused) togglePause();
+  }
+});
+
 // ── Audio ──────────────────────────────────────
 let audioCtx = null;
 function getAudio() {
