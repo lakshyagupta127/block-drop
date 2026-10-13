@@ -296,16 +296,17 @@ function updatePlayerUI() {
 
 // ── Settings Modal ─────────────────────────────
 function openSettings() {
-  SFX.click();
+  try { SFX.click(); } catch(_) {}
   const modal = document.getElementById('settingsModal');
+  if (!modal) return;
   const curEl = document.getElementById('settingsCurrentName');
   const form  = document.getElementById('nameChangeForm');
   const lock  = document.getElementById('nameCooldownNotice');
   const msgEl = document.getElementById('settingsMsg');
-  if (curEl) curEl.textContent = _playerName;
+  if (curEl) curEl.textContent = _playerName || 'Player';
   if (msgEl) { msgEl.textContent=''; msgEl.className='settings-msg'; }
   const inp = document.getElementById('settingsNameInput');
-  if (inp) inp.value = (_playerName !== 'Player') ? _playerName : '';
+  if (inp) inp.value = (_playerName && _playerName !== 'Player') ? _playerName : '';
   if (_canChangeName) {
     if (form) form.style.display='flex';
     if (lock) lock.style.display='none';
@@ -314,6 +315,7 @@ function openSettings() {
     if (lock) { lock.style.display='block'; renderCooldown(); }
   }
   modal.style.display='flex';
+  modal.style.zIndex='100000';
   if (inp && _canChangeName) setTimeout(()=>inp.focus(),100);
 }
 
@@ -332,8 +334,9 @@ function renderCooldown() {
 }
 
 function closeSettings() {
-  SFX.click();
-  document.getElementById('settingsModal').style.display='none';
+  try { SFX.click(); } catch(_) {}
+  const modal = document.getElementById('settingsModal');
+  if (modal) modal.style.display='none';
 }
 
 async function saveSettingsName() {
@@ -852,13 +855,20 @@ function syncControlButtons() {
 
 // ── Leaderboard ────────────────────────────────
 async function openLB() {
-  SFX.click();
+  try { SFX.click(); } catch(_) {}
   const modal=document.getElementById('lbModal');
+  if (!modal) return;
   const tbody=document.getElementById('lbBody');
-  tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:#888;padding:16px">Loading…</td></tr>`;
+  if (tbody) tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:#888;padding:16px">Loading…</td></tr>`;
   modal.style.display='flex';
-  const scores=await apiFetchScores(10);
-  renderLBRows(scores);
+  modal.style.zIndex='100000';
+  try {
+    const scores=await apiFetchScores(10);
+    renderLBRows(scores);
+  } catch(err) {
+    console.error('LB fetch error:', err);
+    if(tbody) tbody.innerHTML=`<tr><td colspan="5" class="no-scores">Unable to load scores right now.</td></tr>`;
+  }
 }
 
 function renderLBRows(scores) {
@@ -888,7 +898,11 @@ function escHtml(str) {
   return String(str).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function closeLB() { SFX.click(); document.getElementById('lbModal').style.display='none'; }
+function closeLB() {
+  try { SFX.click(); } catch(_) {}
+  const modal = document.getElementById('lbModal');
+  if (modal) modal.style.display='none';
+}
 
 // ── Auto score save (no name prompt — name already set in onboarding) ──
 async function autoSaveScore() {
@@ -1141,8 +1155,9 @@ function updateMusicVolume(){
   if(_musicGain) _musicGain.gain.value=(_muted||!_musicOn)?0:_musicVolume*0.3;
 }
 
-function setSliderFill(slider,pct){ slider.style.setProperty('--val',pct+'%'); }
+function setSliderFill(slider,pct){ if(slider) slider.style.setProperty('--val',pct+'%'); }
 
+let _volumeUIBound = false;
 function initVolumeUI(){
   const sfxSlider=document.getElementById('sfxSlider');
   const musicSlider=document.getElementById('musicSlider');
@@ -1150,22 +1165,33 @@ function initVolumeUI(){
   const musicPct=document.getElementById('musicPct');
   const muteBtn=document.getElementById('muteAllBtn');
   const musicBtn=document.getElementById('musicToggleBtn');
-  if(!sfxSlider) return;
-  sfxSlider.value=Math.round(_sfxVolume*100);
-  musicSlider.value=Math.round(_musicVolume*100);
+
+  if(sfxSlider) {
+    sfxSlider.value=Math.round(_sfxVolume*100);
+    setSliderFill(sfxSlider,Math.round(_sfxVolume*100));
+  }
+  if(musicSlider) {
+    musicSlider.value=Math.round(_musicVolume*100);
+    setSliderFill(musicSlider,Math.round(_musicVolume*100));
+  }
   if(sfxPct) sfxPct.textContent=Math.round(_sfxVolume*100)+'%';
   if(musicPct) musicPct.textContent=Math.round(_musicVolume*100)+'%';
-  setSliderFill(sfxSlider,Math.round(_sfxVolume*100));
-  setSliderFill(musicSlider,Math.round(_musicVolume*100));
   if(muteBtn) muteBtn.classList.toggle('active',_muted);
-  if(musicBtn){ musicBtn.classList.toggle('active',_musicOn&&!_muted); musicBtn.textContent=_musicOn?'🎵 Music On':'🎵 Music Off'; }
-  sfxSlider.addEventListener('input',()=>{
+  if(musicBtn){
+    musicBtn.classList.toggle('active',_musicOn&&!_muted);
+    musicBtn.textContent=_musicOn?'🎵 Music On':'🎵 Music Off';
+  }
+
+  if(_volumeUIBound) return;
+  _volumeUIBound = true;
+
+  sfxSlider?.addEventListener('input',()=>{
     _sfxVolume=sfxSlider.value/100; localStorage.setItem(VOLUME_KEY,_sfxVolume);
     if(sfxPct) sfxPct.textContent=sfxSlider.value+'%';
     setSliderFill(sfxSlider,sfxSlider.value);
     if(!_muted) SFX.click();
   });
-  musicSlider.addEventListener('input',()=>{
+  musicSlider?.addEventListener('input',()=>{
     _musicVolume=musicSlider.value/100; localStorage.setItem(MUSIC_KEY,_musicVolume);
     if(musicPct) musicPct.textContent=musicSlider.value+'%';
     setSliderFill(musicSlider,musicSlider.value);
@@ -1187,12 +1213,69 @@ function initVolumeUI(){
   });
 }
 
-function openSettingsAndInit(){ initVolumeUI(); openSettings(); }
+function openSettingsAndInit(){
+  try { initVolumeUI(); } catch(e){ console.warn('initVolumeUI error:', e); }
+  openSettings();
+}
 
 ['settingsBtnMob','settingsBtn2','overlaySettingsBtn','menuNavSettings'].forEach(id=>document.getElementById(id)?.addEventListener('click',openSettingsAndInit));
 document.getElementById('closeSettingsBtn')?.addEventListener('click',closeSettings);
 document.getElementById('saveNameBtn')?.addEventListener('click',saveSettingsName);
 document.getElementById('settingsNameInput')?.addEventListener('keydown',e=>{ if(e.key==='Enter') saveSettingsName(); });
+
+// Global event delegation guaranteeing all modal open/close actions fire
+document.addEventListener('click', (e) => {
+  const lbBtn = e.target.closest('#overlayLbBtn, #menuNavLb, #leaderboardBtn, #leaderboardBtn2, #goLbBtn');
+  if (lbBtn) {
+    e.preventDefault();
+    openLB();
+    return;
+  }
+  const settingsBtn = e.target.closest('#overlaySettingsBtn, #menuNavSettings, #settingsBtnMob, #settingsBtn2');
+  if (settingsBtn) {
+    e.preventDefault();
+    openSettingsAndInit();
+    return;
+  }
+  const guideBtn = e.target.closest('#menuNavGuide, #helpBtn');
+  if (guideBtn) {
+    e.preventDefault();
+    openHowToPlay();
+    return;
+  }
+  const closeLb = e.target.closest('#closeLbBtn');
+  if (closeLb) {
+    e.preventDefault();
+    closeLB();
+    return;
+  }
+  const closeSet = e.target.closest('#closeSettingsBtn');
+  if (closeSet) {
+    e.preventDefault();
+    closeSettings();
+    return;
+  }
+  if (e.target.id === 'lbModal') {
+    closeLB();
+    return;
+  }
+  if (e.target.id === 'settingsModal') {
+    closeSettings();
+    return;
+  }
+});
+
+// Escape key to dismiss modals
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const lb = document.getElementById('lbModal');
+    if (lb && lb.style.display !== 'none') { closeLB(); return; }
+    const st = document.getElementById('settingsModal');
+    if (st && st.style.display !== 'none') { closeSettings(); return; }
+    const htp = document.getElementById('howToPlayModal');
+    if (htp && htp.style.display !== 'none') { closeHowToPlay(); return; }
+  }
+});
 document.getElementById('changeLangBtn')?.addEventListener('click',()=>{
   SFX.click();
   document.getElementById('settingsModal').style.display='none';
@@ -1237,15 +1320,18 @@ document.getElementById('themeNanoBananaBtn')?.addEventListener('click', ()=>{
 // ── How To Play ────────────────────────────────
 const HTP_KEY='bd_htp_seen';
 function openHowToPlay(){
-  SFX.click();
+  try { SFX.click(); } catch(_) {}
   const settingsModal=document.getElementById('settingsModal');
   if(settingsModal) settingsModal.style.display='none';
   const modal=document.getElementById('howToPlayModal');
-  if(modal) modal.style.display='flex';
+  if(modal) {
+    modal.style.display='flex';
+    modal.style.zIndex='100000';
+  }
   if(gameRunning&&!paused) togglePause();
 }
 function closeHowToPlay(){
-  SFX.click();
+  try { SFX.click(); } catch(_) {}
   const modal=document.getElementById('howToPlayModal');
   if(modal) modal.style.display='none';
   localStorage.setItem(HTP_KEY,'true');

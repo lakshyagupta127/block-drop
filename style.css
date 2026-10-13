@@ -434,6 +434,7 @@ body.in-menu #gameCanvas {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-radius: 10px;
+  z-index: 50;
 }
 
 #overlay h2 {
@@ -629,27 +630,37 @@ body.in-menu #gameCanvas {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(4, 4, 10, 0.84);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(4, 4, 10, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 100;
+  z-index: 100000 !important;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal {
   background: linear-gradient(180deg, #1b1b33 0%, #101020 100%);
   border: 1px solid rgba(120, 120, 200, 0.35);
   border-radius: 14px;
-  padding: 28px 24px;
+  padding: 24px 20px;
   min-width: 300px;
   max-width: 92vw;
+  max-height: 88vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 35px rgba(80, 80, 220, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #76ff03 rgba(0, 0, 0, 0.3);
 }
 
 .modal h2 {
@@ -937,8 +948,10 @@ body.in-menu #gameCanvas {
    Settings Modal
 ───────────────────────────────────────────── */
 .settings-modal {
-  min-width: 320px;
-  max-width: 94vw;
+  min-width: 300px;
+  max-width: 480px;
+  width: 94vw;
+  max-height: 88vh;
 }
 
 .settings-section {
@@ -3589,6 +3602,10 @@ body.theme-nano-banana .modal h2 {
   border-radius: 8px;
   clip-path: polygon(6px 0%, calc(100% - 6px) 0%, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0% calc(100% - 6px), 0% 6px);
   white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .overlay-btn-row .retro-btn.secondary:hover {
@@ -3651,6 +3668,12 @@ body:not(.in-menu) .menu-bottom-bar {
   transition: all 0.15s ease;
   font-family: inherit;
   border-radius: 8px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.menu-nav-item * {
+  pointer-events: none;
 }
 
 .menu-nav-item .nav-icon {
