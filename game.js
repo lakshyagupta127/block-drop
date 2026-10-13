@@ -701,10 +701,8 @@ function togglePause() {
     showOverlay(`
       <h2>PAUSED</h2>
       <button class="retro-btn" id="resumeBtn">▶ Resume</button>
-      <button class="retro-btn secondary" id="pauseRestartBtn">🔄 Restart</button>
     `);
     document.getElementById('resumeBtn')?.addEventListener('click', togglePause);
-    document.getElementById('pauseRestartBtn')?.addEventListener('click', ()=>{ SFX.click(); startGame(); });
   } else {
     overlay.style.display='none';
     lastDrop=performance.now();
@@ -936,6 +934,7 @@ function bindTouchBtnPause(id,action){
   el.addEventListener('mousedown',fire);
 }
 document.getElementById('pauseBtn')?.addEventListener('click',()=>{ SFX.click(); if(!gameRunning) return; togglePause(); });
+document.getElementById('restartTopBtn')?.addEventListener('click',()=>{ SFX.click(); startGame(); });
 
 // ── Volume & Music Controller ──────────────────
 const VOLUME_KEY  = 'bd_sfx_vol';
