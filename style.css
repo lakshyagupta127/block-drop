@@ -3074,3 +3074,137 @@ body.in-menu #gameCanvas {
   flex-shrink: 0;
   line-height: 1;
 }
+
+/* ─────────────────────────────────────────────
+   NANO BANANA THEME (13+ Cyber Arcade Aesthetic)
+───────────────────────────────────────────── */
+body.theme-nano-banana {
+  background: radial-gradient(circle at 50% 25%, #18190c 0%, #0d0e06 55%, #050602 100%);
+  color: #f7f7e6;
+}
+
+body.theme-nano-banana #gameCanvas {
+  border-color: rgba(254, 230, 0, 0.45);
+  box-shadow:
+    0 0 32px rgba(254, 230, 0, 0.22),
+    0 12px 32px rgba(0, 0, 0, 0.9),
+    inset 0 0 20px rgba(254, 230, 0, 0.08);
+}
+
+body.theme-nano-banana .stat-pill,
+body.theme-nano-banana .next-panel-box {
+  background: linear-gradient(180deg, rgba(32, 34, 16, 0.94) 0%, rgba(16, 17, 8, 0.98) 100%);
+  border: 1px solid rgba(254, 230, 0, 0.35);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 180, 0.15);
+}
+
+body.theme-nano-banana .next-panel-box h3 {
+  color: #ffe600;
+  text-shadow: 0 0 10px rgba(254, 230, 0, 0.6);
+}
+
+body.theme-nano-banana .stat-label {
+  color: #c4c48a;
+  letter-spacing: 1.6px;
+}
+
+body.theme-nano-banana .stat-val {
+  color: #ffe600;
+  text-shadow: 0 0 14px rgba(254, 230, 0, 0.65);
+}
+
+body.theme-nano-banana .stat-pill:nth-of-type(2) .stat-val {
+  color: #c6ff00;
+  text-shadow: 0 0 14px rgba(198, 255, 0, 0.65);
+}
+
+body.theme-nano-banana .speed-val {
+  color: #76ff03 !important;
+  text-shadow: 0 0 14px rgba(118, 255, 3, 0.65);
+}
+
+/* Touch controls in Nano Banana theme */
+body.theme-nano-banana .touch-controls {
+  background: linear-gradient(180deg, rgba(18, 19, 10, 0.92) 0%, rgba(8, 9, 4, 0.98) 100%);
+  border-top: 1px solid rgba(254, 230, 0, 0.25);
+}
+
+body.theme-nano-banana .t-btn {
+  background: linear-gradient(180deg, #303218 0%, #1a1b0a 100%);
+  border: 1px solid rgba(254, 230, 0, 0.35);
+  color: #ffffea;
+  box-shadow:
+    0 5px 0 #0c0d04,
+    0 7px 12px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 180, 0.2);
+}
+
+body.theme-nano-banana .rotate-btn {
+  background: linear-gradient(180deg, #42460f 0%, #242608 100%);
+  border-color: rgba(254, 230, 0, 0.55);
+  color: #ffff33;
+  box-shadow:
+    0 5px 0 #0e1003,
+    0 7px 12px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 180, 0.25);
+}
+
+body.theme-nano-banana .drop-btn {
+  background: linear-gradient(180deg, #4e3d0e 0%, #2a2006 100%);
+  border-color: rgba(255, 190, 0, 0.55);
+  color: #ffe066;
+  box-shadow:
+    0 5px 0 #120e03,
+    0 7px 12px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 180, 0.2);
+}
+
+/* Action pill buttons in Nano Banana theme */
+body.theme-nano-banana .pause-pill-btn {
+  background: linear-gradient(180deg, #443810 0%, #241d06 100%);
+  border-color: #ffd000;
+  color: #fff080;
+  box-shadow: 0 3px 0 #100d02, 0 6px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 180, 0.2);
+}
+
+body.theme-nano-banana .restart-pill-btn {
+  background: linear-gradient(180deg, #303814 0%, #181d08 100%);
+  border-color: #aeea00;
+  color: #e4ff85;
+  box-shadow: 0 3px 0 #0a0d03, 0 6px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 180, 0.2);
+}
+
+body.theme-nano-banana .settings-pill-btn {
+  background: linear-gradient(180deg, #343422 0%, #1a1a10 100%);
+  border-color: #888850;
+  color: #dedebb;
+  box-shadow: 0 3px 0 #0c0c07, 0 6px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 180, 0.15);
+}
+
+/* Overlay & Modals in Nano Banana theme */
+body.theme-nano-banana #overlay {
+  background: rgba(10, 11, 4, 0.88);
+}
+
+body.theme-nano-banana #overlay h2 {
+  color: #ffe600;
+  text-shadow: 0 0 18px rgba(254, 230, 0, 0.85), 0 0 36px rgba(198, 255, 0, 0.5);
+}
+
+body.theme-nano-banana .retro-btn {
+  background: linear-gradient(180deg, #404212 0%, #222308 100%);
+  border-color: rgba(254, 230, 0, 0.5);
+  color: #ffffe6;
+  box-shadow: 0 4px 0 #0e0f03, 0 6px 14px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 180, 0.25);
+}
+
+body.theme-nano-banana .modal {
+  background: linear-gradient(180deg, #1d1e0c 0%, #0e0f05 100%);
+  border-color: rgba(254, 230, 0, 0.45);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85), 0 0 35px rgba(254, 230, 0, 0.25), inset 0 1px 0 rgba(255, 255, 180, 0.15);
+}
+
+body.theme-nano-banana .modal h2 {
+  color: #ffe600;
+  text-shadow: 0 0 14px rgba(254, 230, 0, 0.7);
+}

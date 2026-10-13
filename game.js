@@ -1129,6 +1129,35 @@ document.getElementById('changeLangBtn')?.addEventListener('click',()=>{
   }
 });
 
+// ── Theme Management (Classic Cyber vs Nano Banana 13+) ──
+const THEME_KEY = 'bd_ui_theme';
+function applyTheme(themeName) {
+  if (themeName === 'classic') {
+    document.body.classList.remove('theme-nano-banana');
+    document.getElementById('themeClassicBtn')?.classList.add('active');
+    document.getElementById('themeNanoBananaBtn')?.classList.remove('active');
+  } else {
+    document.body.classList.add('theme-nano-banana');
+    document.getElementById('themeNanoBananaBtn')?.classList.add('active');
+    document.getElementById('themeClassicBtn')?.classList.remove('active');
+  }
+  try { localStorage.setItem(THEME_KEY, themeName); } catch(e){}
+}
+
+const savedTheme = (function(){
+  try { return localStorage.getItem(THEME_KEY) || 'nano-banana'; } catch(e){ return 'nano-banana'; }
+})();
+applyTheme(savedTheme);
+
+document.getElementById('themeClassicBtn')?.addEventListener('click', ()=>{
+  SFX.click();
+  applyTheme('classic');
+});
+document.getElementById('themeNanoBananaBtn')?.addEventListener('click', ()=>{
+  SFX.click();
+  applyTheme('nano-banana');
+});
+
 // ── How To Play ────────────────────────────────
 const HTP_KEY='bd_htp_seen';
 function openHowToPlay(){
