@@ -701,13 +701,44 @@ function togglePause() {
     showOverlay(`
       <h2>PAUSED</h2>
       <button class="retro-btn" id="resumeBtn">▶ Resume</button>
+      <button class="retro-btn secondary" id="returnMenuBtn">🏠 Return to Menu</button>
     `);
     document.getElementById('resumeBtn')?.addEventListener('click', togglePause);
+    document.getElementById('returnMenuBtn')?.addEventListener('click', returnToMenu);
   } else {
     overlay.style.display='none';
     lastDrop=performance.now();
   }
   syncPauseBtn();
+}
+
+function returnToMenu() {
+  SFX.click();
+  gameRunning = false;
+  paused = false;
+  _gameToken = null;
+  cancelAnimationFrame(animFrame);
+  stopHints();
+  syncControlButtons();
+  ctx.fillStyle = '#0a0a18';
+  ctx.fillRect(0, 0, 300, 600);
+  showOverlay(`
+    <div class="overlay-name-tag" id="overlayNameTag"></div>
+    <h2>BLOCK DROP</h2>
+    <div class="overlay-personal-best" id="overlayPersonalBest" style="display:none"></div>
+    <p data-i18n="tap_to_start">Tap or press Space to start</p>
+    <button class="retro-btn" id="startBtn" data-i18n="start_game">▶ Start Game</button>
+    <button class="retro-btn secondary" id="overlayLbBtn" data-i18n="leaderboard">🏆 Leaderboard</button>
+    <button class="retro-btn secondary" id="overlaySettingsBtn" data-i18n="settings">⚙️ Settings</button>
+  `);
+  document.getElementById('startBtn')?.addEventListener('click', startGame);
+  document.getElementById('overlayLbBtn')?.addEventListener('click', openLB);
+  document.getElementById('overlaySettingsBtn')?.addEventListener('click', openSettingsAndInit);
+  if (typeof applyLanguage === 'function' && typeof getSavedLang === 'function') {
+    const lang = getSavedLang();
+    if (lang) applyLanguage(lang);
+  }
+  updatePlayerUI();
 }
 
 function syncPauseBtn() {
