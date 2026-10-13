@@ -822,14 +822,8 @@ function returnToMenu() {
     <div class="overlay-personal-best" id="overlayPersonalBest" style="display:none"></div>
     <p class="menu-sub-hint" data-i18n="tap_to_start">Tap or press Space to start</p>
     <button class="retro-btn start-game-btn" id="startBtn" data-i18n="start_game">START GAME ▶</button>
-    <div class="overlay-btn-row">
-      <button class="retro-btn secondary" id="overlayLbBtn" data-i18n="leaderboard">🏆 Leaderboard</button>
-      <button class="retro-btn secondary" id="overlaySettingsBtn" data-i18n="settings">⚙️ Settings</button>
-    </div>
   `);
   document.getElementById('startBtn')?.addEventListener('click', startGame);
-  document.getElementById('overlayLbBtn')?.addEventListener('click', openLB);
-  document.getElementById('overlaySettingsBtn')?.addEventListener('click', openSettingsAndInit);
   if (typeof applyLanguage === 'function' && typeof getSavedLang === 'function') {
     const lang = getSavedLang();
     if (lang) applyLanguage(lang);

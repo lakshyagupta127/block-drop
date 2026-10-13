@@ -14,7 +14,7 @@
   <link rel="icon" type="image/jpeg" href="/icon.jpg">
   <link rel="apple-touch-icon" href="/icon.jpg">
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="style.css?v=2.2">
+  <link rel="stylesheet" href="style.css?v=2.3">
 </head>
 <body class="in-menu">
 
@@ -103,10 +103,6 @@
         <div class="overlay-personal-best" id="overlayPersonalBest" style="display:none"></div>
         <p class="menu-sub-hint" data-i18n="tap_to_start">Tap or press Space to start</p>
         <button class="retro-btn start-game-btn" id="startBtn" data-i18n="start_game">START GAME ▶</button>
-        <div class="overlay-btn-row">
-          <button class="retro-btn secondary" id="overlayLbBtn" data-i18n="leaderboard">🏆 Leaderboard</button>
-          <button class="retro-btn secondary" id="overlaySettingsBtn" data-i18n="settings">⚙️ Settings</button>
-        </div>
       </div>
     </div>
 
@@ -171,7 +167,7 @@
       </button>
       <button class="menu-nav-item" id="menuNavLb" title="Leaderboard">
         <span class="nav-icon">🏆</span>
-        <span class="nav-label">SCORES</span>
+        <span class="nav-label">LEADERBOARD</span>
       </button>
       <button class="menu-nav-item" id="menuNavSettings" title="Settings">
         <span class="nav-icon">⚙️</span>
@@ -277,12 +273,6 @@
           <span class="current-name-value" id="currentLangDisplay">English</span>
         </div>
         <button class="retro-btn secondary" id="changeLangBtn" data-i18n="change_language">Change Language</button>
-      </div>
-
-      <!-- How to Play section -->
-      <div class="settings-section">
-        <div class="settings-section-title">❓ Guide</div>
-        <button class="retro-btn secondary" id="helpBtn">❓ How to Play</button>
       </div>
 
       <!-- Data & Privacy section -->
@@ -617,7 +607,7 @@
   </div>
 
   <!-- i18n must load before game.js -->
-  <script src="i18n.js?v=2.2"></script>
-  <script src="game.js?v=2.2"></script>
+  <script src="i18n.js?v=2.3"></script>
+  <script src="game.js?v=2.3"></script>
 </body>
 </html>
