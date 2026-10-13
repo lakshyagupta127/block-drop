@@ -37,6 +37,13 @@
     </div>
   </div>
 
+  <!-- ── Cyber Header (from image) ── -->
+  <header class="cyber-header">
+    <div class="cyber-circuit cyber-circuit-left"></div>
+    <h1 class="cyber-logo"><span class="logo-block">BLOCK</span> <span class="logo-drop">DROP</span></h1>
+    <div class="cyber-circuit cyber-circuit-right"></div>
+  </header>
+
   <!-- ── Main layout ── -->
   <div class="game-wrapper">
 
@@ -95,10 +102,10 @@
       </div>
     </div>
 
-    <!-- Right vertical panel (Next piece, Score, Level, Speed, Settings, Pause, Restart) -->
+    <!-- Right vertical panel (Next piece, Score, Level, Speed, Pause, Restart, Settings) -->
     <div class="right-panel">
       <div class="panel-box next-panel-box">
-        <h3 data-i18n="next">Next</h3>
+        <h3 data-i18n="next">NEXT</h3>
         <canvas id="nextCanvas" width="100" height="100"></canvas>
       </div>
       <div class="stat-pill side-score-pill">
@@ -111,41 +118,50 @@
       </div>
       <div class="stat-pill side-score-pill speed-pill">
         <span class="stat-label" data-i18n="speed">SPEED</span>
-        <span class="stat-val speed-val" id="speedDisplayMob">0%</span>
+        <span class="stat-val speed-val" id="speedDisplayMob">X1</span>
       </div>
-      <button class="action-pill-btn settings-pill-btn" id="settingsBtnMob"  title="Settings">
-        <span class="action-icon">⚙️</span>
-        <span class="action-label" data-i18n="settings">SETTINGS</span>
-      </button>
       <button class="action-pill-btn pause-pill-btn" id="pauseBtn" title="Pause">
-        <span class="action-icon">⏸</span>
         <span class="action-label">PAUSE</span>
+        <span class="action-icon">⏸</span>
       </button>
       <button class="action-pill-btn restart-pill-btn" id="restartTopBtn" title="Restart">
-        <span class="action-icon">🔄</span>
         <span class="action-label">RESTART</span>
+        <span class="action-icon">↺</span>
+      </button>
+      <button class="action-pill-btn settings-pill-btn" id="settingsBtnMob" title="Settings">
+        <span class="action-label" data-i18n="settings">SETTINGS</span>
+        <span class="action-icon">⚙</span>
       </button>
     </div>
 
   </div>
 
-  <!-- ── Mobile touch controls ── -->
+  <!-- ── Mobile touch controls (Matching Cyber Banana D-pad & Drop Layout) ── -->
   <div class="touch-controls mobile-only">
+    <div class="touch-controls-cluster">
 
-    <!-- Row 1: Move + Rotate -->
-    <div class="touch-row">
-      <button class="t-btn" id="btnLeft"   aria-label="Move Left">◀</button>
-      <button class="t-btn rotate-btn" id="btnRotate" aria-label="Rotate">↻</button>
-      <button class="t-btn" id="btnRight"  aria-label="Move Right">▶</button>
+      <!-- Left: D-pad Keycap Cluster -->
+      <div class="dpad-cluster">
+        <div class="dpad-top-row">
+          <button class="t-btn cyber-key" id="btnRotate" aria-label="Rotate">↑</button>
+        </div>
+        <div class="dpad-bottom-row">
+          <button class="t-btn cyber-key" id="btnLeft" aria-label="Move Left">←</button>
+          <button class="t-btn cyber-key" id="btnRight" aria-label="Move Right">→</button>
+          <button class="t-btn cyber-key" id="btnRotate2" aria-label="Rotate">↑</button>
+          <button class="t-btn cyber-key" id="btnDown" aria-label="Soft Drop">↓</button>
+        </div>
+      </div>
+
+      <!-- Right: Big DROP strike key -->
+      <div class="drop-cluster">
+        <button class="t-btn cyber-drop-key" id="btnDrop" aria-label="Hard Drop">
+          <span class="drop-key-icon">⮋</span>
+          <span class="drop-key-label">DROP</span>
+        </button>
+      </div>
+
     </div>
-
-    <!-- Row 2: Drop buttons -->
-    <div class="touch-row">
-      <button class="t-btn wide-btn" id="btnDown" aria-label="Soft Drop">▼ <span data-i18n="soft_drop">Soft</span></button>
-      <button class="t-btn wide-btn drop-btn" id="btnDrop" aria-label="Hard Drop">⬇ <span data-i18n="hard_drop">Drop</span></button>
-    </div>
-
-
   </div>
 
   <!-- ── Leaderboard Modal ── -->

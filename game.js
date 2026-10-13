@@ -10,8 +10,8 @@ const ROWS  = 20;
 const BLOCK = 30;
 
 const COLORS = {
-  I:'#00f0f0', O:'#f0f000', T:'#a000f0',
-  S:'#00f000', Z:'#f00000', J:'#0000f0', L:'#f0a000',
+  I:'#00e5ff', O:'#ffe600', T:'#b800ff',
+  S:'#39ff14', Z:'#ff1744', J:'#2979ff', L:'#ff9100',
 };
 
 const SHAPES = {
@@ -569,21 +569,53 @@ function updateUI() {
   const speedBar=document.getElementById('speedBar');
   const speedMobEl=document.getElementById('speedDisplayMob');
   if(speedEl) speedEl.textContent=pct+'%';
-  if(speedMobEl){speedMobEl.textContent=pct+'%';speedMobEl.style.color=`hsl(${hue},90%,60%)`;}
+  if(speedMobEl){speedMobEl.textContent='X'+Math.min(10,Math.max(1,level));}
   if(speedBar){speedBar.style.width=pct+'%';speedBar.style.background=`hsl(${hue},90%,55%)`;}
 }
 
 function showOverlay(html) { overlay.innerHTML=html; overlay.style.display='flex'; }
 
 // ── Drawing ────────────────────────────────────
+function drawCyberBlock(context,bx,by,color,alpha,bSize){
+  context.save();
+  context.globalAlpha=alpha;
+  const pad=1.5;
+  const size=bSize-pad*2;
+  const rad=3.5;
+  const x=bx+pad, y=by+pad;
+
+  // Dark glassy core
+  context.fillStyle='rgba(8, 12, 22, 0.78)';
+  if(context.roundRect){ context.beginPath(); context.roundRect(x,y,size,size,rad); context.fill(); }
+  else { context.fillRect(x,y,size,size); }
+
+  // Neon translucent tint
+  context.fillStyle=color;
+  context.globalAlpha=alpha*0.38;
+  if(context.roundRect){ context.beginPath(); context.roundRect(x,y,size,size,rad); context.fill(); }
+  else { context.fillRect(x,y,size,size); }
+
+  // Glowing perimeter neon stroke
+  context.globalAlpha=alpha;
+  context.strokeStyle=color;
+  context.lineWidth=2;
+  context.shadowColor=color;
+  context.shadowBlur=7;
+  if(context.roundRect){ context.beginPath(); context.roundRect(x,y,size,size,rad); context.stroke(); }
+  else { context.strokeRect(x,y,size,size); }
+
+  // Specular reflection highlight streak
+  context.shadowBlur=0;
+  context.fillStyle='rgba(255, 255, 255, 0.28)';
+  if(context.roundRect){ context.beginPath(); context.roundRect(x+2,y+2,size-4,3,1.5); context.fill(); }
+  else { context.fillRect(x+2,y+2,size-4,3); }
+
+  context.restore();
+}
+
 function drawBlock(context,x,y,color,alpha){
   alpha=alpha!==undefined?alpha:1;
-  context.globalAlpha=alpha;
-  context.fillStyle=color;
-  context.fillRect(x*BLOCK+1,y*BLOCK+1,BLOCK-2,BLOCK-2);
-  context.fillStyle='rgba(255,255,255,0.18)';
-  context.fillRect(x*BLOCK+2,y*BLOCK+2,BLOCK-4,6);
-  context.globalAlpha=1;
+  drawCyberBlock(context,x*BLOCK,y*BLOCK,color,alpha,BLOCK);
 }
 
 function ghostY() {
@@ -593,16 +625,16 @@ function ghostY() {
 }
 
 function drawBoard() {
-  ctx.fillStyle='#0a0a18';
+  ctx.fillStyle='#06080e';
   ctx.fillRect(0,0,300,600);
-  ctx.strokeStyle='rgba(255,255,255,0.04)'; ctx.lineWidth=0.5;
+  ctx.strokeStyle='rgba(0, 180, 255, 0.12)'; ctx.lineWidth=0.75;
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) ctx.strokeRect(c*BLOCK,r*BLOCK,BLOCK,BLOCK);
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(board[r][c]) drawBlock(ctx,c,r,board[r][c]);
   const gy=ghostY();
   if(gy!==currentPiece.y)
     for(let r=0;r<currentPiece.shape.length;r++)
       for(let c=0;c<currentPiece.shape[r].length;c++)
-        if(currentPiece.shape[r][c]) drawBlock(ctx,currentPiece.x+c,gy+r,currentPiece.color,0.2);
+        if(currentPiece.shape[r][c]) drawBlock(ctx,currentPiece.x+c,gy+r,currentPiece.color,0.25);
   for(let r=0;r<currentPiece.shape.length;r++)
     for(let c=0;c<currentPiece.shape[r].length;c++)
       if(currentPiece.shape[r][c]) drawBlock(ctx,currentPiece.x+c,currentPiece.y+r,currentPiece.color);
@@ -611,14 +643,12 @@ function drawBoard() {
 function drawNext() {
   if (!nextCtx) return;
   const bSize=20;
-  nextCtx.fillStyle='#1a1a2e'; nextCtx.fillRect(0,0,100,100);
+  nextCtx.clearRect(0,0,100,100);
+  nextCtx.fillStyle='#0b0f19'; nextCtx.fillRect(0,0,100,100);
   const s=nextPiece.shape;
   const offX=Math.floor((5-s[0].length)/2),offY=Math.floor((5-s.length)/2);
   for(let r=0;r<s.length;r++) for(let c=0;c<s[r].length;c++) if(s[r][c]){
-    nextCtx.fillStyle=nextPiece.color;
-    nextCtx.fillRect((offX+c)*bSize+1,(offY+r)*bSize+1,bSize-2,bSize-2);
-    nextCtx.fillStyle='rgba(255,255,255,0.18)';
-    nextCtx.fillRect((offX+c)*bSize+2,(offY+r)*bSize+2,bSize-4,5);
+    drawCyberBlock(nextCtx,(offX+c)*bSize,(offY+r)*bSize,nextPiece.color,1,bSize);
   }
 }
 
@@ -949,6 +979,7 @@ function bindTouchBtn(id,action){
 bindTouchBtn('btnLeft',  ()=>{ if(isValid(currentPiece.shape,currentPiece.x-1,currentPiece.y)){currentPiece.x--;SFX.move();HAP.move();} });
 bindTouchBtn('btnRight', ()=>{ if(isValid(currentPiece.shape,currentPiece.x+1,currentPiece.y)){currentPiece.x++;SFX.move();HAP.move();} });
 bindTouchBtn('btnRotate',()=>tryRotate());
+bindTouchBtn('btnRotate2',()=>tryRotate());
 bindTouchBtn('btnDown',  ()=>{ moveDown(); score++; updateUI(); lastDrop=performance.now(); });
 bindTouchBtn('btnDrop',  ()=>hardDrop());
 
