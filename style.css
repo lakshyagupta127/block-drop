@@ -32,8 +32,8 @@ html, body {
   display: none;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 8px 10px 4px;
+  gap: 12px;
+  padding: 10px 14px 8px;
   background: var(--panel-bg);
   border-bottom: 1px solid var(--border);
   flex-wrap: wrap;
@@ -62,19 +62,19 @@ body.in-menu #gameCanvas {
   align-items: center;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 4px 10px;
-  min-width: 60px;
+  border-radius: 10px;
+  padding: 6px 14px;
+  min-width: 85px;
 }
 
 .stat-label {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
   letter-spacing: 1px;
 }
 
 .stat-val {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: bold;
   color: var(--text);
 }
@@ -82,10 +82,10 @@ body.in-menu #gameCanvas {
 .icon-btn {
   background: var(--btn-face);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text);
-  font-size: 18px;
-  padding: 6px 10px;
+  font-size: 22px;
+  padding: 8px 14px;
   cursor: pointer;
   transition: transform 0.08s, box-shadow 0.08s;
   box-shadow: 0 3px 0 var(--btn-shadow);
@@ -478,10 +478,10 @@ body.in-menu #gameCanvas {
   .touch-controls { display: flex; width: 100%; }
 
   /* Top bar scales text and pills */
-  .stat-pill { min-width: clamp(44px, 13vw, 64px); padding: 3px 6px; }
-  .stat-val  { font-size: clamp(12px, 4vw, 18px); }
-  .stat-label{ font-size: clamp(7px, 2vw, 10px); }
-  .icon-btn  { font-size: clamp(14px, 4vw, 18px); padding: 5px 8px; }
+  .stat-pill { min-width: clamp(78px, 22vw, 105px); padding: 6px 12px; }
+  .stat-val  { font-size: clamp(16px, 5vw, 22px); }
+  .stat-label{ font-size: clamp(9px, 2.8vw, 11px); }
+  .icon-btn  { font-size: clamp(19px, 5.5vw, 24px); padding: 8px 13px; }
 
   /* Touch buttons scale with screen */
   .t-btn     { width: clamp(56px, 20vw, 80px); height: clamp(48px, 14vw, 66px); font-size: clamp(16px, 5vw, 22px); }
@@ -545,10 +545,10 @@ body.in-menu #gameCanvas {
 
 /* ── Very small phones (≤360px — iPhone SE, Galaxy A series) ── */
 @media (max-width: 360px) {
-  .stat-pill { min-width: 40px; padding: 3px 5px; }
-  .stat-val  { font-size: 12px; }
-  .stat-label{ font-size: 7px; letter-spacing: 0; }
-  .icon-btn  { font-size: 14px; padding: 4px 6px; }
+  .stat-pill { min-width: 68px; padding: 5px 10px; }
+  .stat-val  { font-size: 15px; }
+  .stat-label{ font-size: 9px; letter-spacing: 0.5px; }
+  .icon-btn  { font-size: 18px; padding: 7px 11px; }
 
   .t-btn    { width: 52px; height: 44px; font-size: 15px; }
   .wide-btn { width: 84px; font-size: 11px; }
