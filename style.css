@@ -134,8 +134,68 @@ body.in-menu #gameCanvas {
   background: var(--panel-bg);
 }
 
-.side-icon-btn {
+.action-pill-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   width: 100%;
+  padding: 6px 4px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  font-family: 'Courier New', monospace;
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.08s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.action-pill-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #000;
+}
+
+.action-pill-btn .action-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.action-pill-btn .action-label {
+  font-size: 8px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* Pause button — Amber / Gold (Green when Paused) */
+.pause-pill-btn {
+  background: linear-gradient(180deg, #3d3018 0%, #241c0c 100%);
+  border-color: #f39c12;
+  color: #ffdc73;
+  box-shadow: 0 3px 0 #140f06;
+}
+.pause-pill-btn.is-paused {
+  background: linear-gradient(180deg, #1b3d22 0%, #0d2112 100%);
+  border-color: #2ecc71;
+  color: #a3f7bf;
+  box-shadow: 0 3px 0 #08140a;
+}
+
+/* Restart button — Vibrant Cyan / Ice */
+.restart-pill-btn {
+  background: linear-gradient(180deg, #193147 0%, #0d1d2b 100%);
+  border-color: #3498db;
+  color: #9cd5ff;
+  box-shadow: 0 3px 0 #071018;
+}
+
+/* Settings button — Sleek Dark Indigo */
+.settings-pill-btn {
+  background: linear-gradient(180deg, #2a2a40 0%, #171724 100%);
+  border-color: #5c5c80;
+  color: #c8c8e6;
+  box-shadow: 0 3px 0 #0a0a10;
 }
 
 /* ─────────────────────────────────────────────

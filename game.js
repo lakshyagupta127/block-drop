@@ -761,10 +761,13 @@ function returnToMenu() {
 
 function syncPauseBtn() {
   const topBtn=document.getElementById('pauseBtn');
+  if(!topBtn) return;
   if(paused){
-    if(topBtn) topBtn.textContent='▶';
+    topBtn.classList.add('is-paused');
+    topBtn.innerHTML='<span class="action-icon">▶</span><span class="action-label">RESUME</span>';
   } else {
-    if(topBtn) topBtn.textContent='⏸';
+    topBtn.classList.remove('is-paused');
+    topBtn.innerHTML='<span class="action-icon">⏸</span><span class="action-label">PAUSE</span>';
   }
 }
 
