@@ -40,8 +40,6 @@
   <!-- ── Top bar (mobile) ── -->
   <div class="top-bar">
     <div class="stat-pill"><span class="stat-label" data-i18n="score">SCORE</span><span class="stat-val" id="scoreDisplay">0</span></div>
-    <button class="icon-btn" id="leaderboardBtn"  title="Leaderboard">🏆</button>
-    <button class="icon-btn" id="helpBtn"         title="How to Play">❓</button>
     <button class="icon-btn" id="settingsBtnMob"  title="Settings">⚙️</button>
     <button class="icon-btn" id="pauseBtn"         title="Pause">⏸</button>
     <button class="icon-btn" id="restartTopBtn"    title="Restart">🔄</button>
@@ -56,7 +54,6 @@
         <h3 data-i18n="score">Score</h3>
         <div class="value" id="scoreDisplay2">0</div>
       </div>
-      <button class="lb-btn desktop-only" id="leaderboardBtn2">🏆 <span data-i18n="leaderboard">Scores</span></button>
       <button class="lb-btn desktop-only settings-lb-btn" id="settingsBtn2">⚙️ <span data-i18n="settings">Settings</span></button>
     </div>
 
@@ -241,6 +238,12 @@
           <span class="current-name-value" id="currentLangDisplay">English</span>
         </div>
         <button class="retro-btn secondary" id="changeLangBtn" data-i18n="change_language">Change Language</button>
+      </div>
+
+      <!-- How to Play section -->
+      <div class="settings-section">
+        <div class="settings-section-title">❓ Guide</div>
+        <button class="retro-btn secondary" id="helpBtn">❓ How to Play</button>
       </div>
 
       <!-- Data & Privacy section -->

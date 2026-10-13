@@ -1112,6 +1112,8 @@ document.getElementById('changeLangBtn')?.addEventListener('click',()=>{
 const HTP_KEY='bd_htp_seen';
 function openHowToPlay(){
   SFX.click();
+  const settingsModal=document.getElementById('settingsModal');
+  if(settingsModal) settingsModal.style.display='none';
   const modal=document.getElementById('howToPlayModal');
   if(modal) modal.style.display='flex';
   if(gameRunning&&!paused) togglePause();
