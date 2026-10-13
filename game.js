@@ -863,9 +863,11 @@ function showGameOverOverlay(rank, bestScore) {
     ${rankMsg}
     <button class="retro-btn" id="restartBtn">▶ Play Again</button>
     <button class="retro-btn secondary" id="goLbBtn">🏆 Leaderboard</button>
+    <button class="retro-btn secondary" id="goMenuBtn">🏠 Return to Menu</button>
   `);
   document.getElementById('restartBtn').addEventListener('click', startGame);
   document.getElementById('goLbBtn').addEventListener('click', openLB);
+  document.getElementById('goMenuBtn').addEventListener('click', returnToMenu);
   // Refresh stats
   if(_playerFp){
     fetch(`/api/player/stats?fp=${encodeURIComponent(_playerFp)}`)
