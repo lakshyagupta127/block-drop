@@ -951,7 +951,7 @@ function fxReviveClear(topRows) {
   if (wrap) {
     const el = document.createElement('div');
     el.className = 'revive-toast';
-    el.innerHTML = '<span class="revive-toast-icon">⚡</span> <strong>REVIVED!</strong><small>TOP 40% CLEARED</small>';
+    el.innerHTML = '<span class="revive-toast-icon">⚡</span> <strong>REVIVED!</strong>';
     wrap.appendChild(el);
     setTimeout(() => el.remove(), 1800);
   }
@@ -1164,7 +1164,7 @@ function showGameOverOverlay(rank, bestScore) {
   const rankMsg=rank?`<p>You ranked <strong>#${rank}</strong> on the leaderboard!</p>`:'';
 
   const reviveBtnHtml = (!_hasRevivedThisGame && _reviveSecondsLeft > 0)
-    ? `<button class="retro-btn revive-overlay-btn" id="overlayReviveBtn">⚡ REVIVE (<span id="overlayReviveTimer">${_reviveSecondsLeft}</span>s) · CLEAR TOP 40%</button>`
+    ? `<button class="retro-btn revive-overlay-btn" id="overlayReviveBtn">⚡ REVIVE (<span id="overlayReviveTimer">${_reviveSecondsLeft}</span>s)</button>`
     : '';
 
   showOverlay(`
