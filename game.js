@@ -1657,8 +1657,9 @@ function initVolumeUI(){
   const musicSlider=document.getElementById('musicSlider');
   const sfxPct=document.getElementById('sfxPct');
   const musicPct=document.getElementById('musicPct');
-  const muteBtn=document.getElementById('muteAllBtn');
   const musicBtn=document.getElementById('musicToggleBtn');
+
+  _muted = false;
 
   if(sfxSlider) {
     sfxSlider.value=Math.round(_sfxVolume*100);
@@ -1670,9 +1671,8 @@ function initVolumeUI(){
   }
   if(sfxPct) sfxPct.textContent=Math.round(_sfxVolume*100)+'%';
   if(musicPct) musicPct.textContent=Math.round(_musicVolume*100)+'%';
-  if(muteBtn) muteBtn.classList.toggle('active',_muted);
   if(musicBtn){
-    musicBtn.classList.toggle('active',_musicOn&&!_muted);
+    musicBtn.classList.toggle('active',_musicOn);
     musicBtn.textContent=_musicOn?'🎵 Music On':'🎵 Music Off';
   }
 
@@ -1683,7 +1683,7 @@ function initVolumeUI(){
     _sfxVolume=sfxSlider.value/100; localStorage.setItem(VOLUME_KEY,_sfxVolume);
     if(sfxPct) sfxPct.textContent=sfxSlider.value+'%';
     setSliderFill(sfxSlider,sfxSlider.value);
-    if(!_muted) SFX.click();
+    SFX.click();
   });
   musicSlider?.addEventListener('input',()=>{
     _musicVolume=musicSlider.value/100; localStorage.setItem(MUSIC_KEY,_musicVolume);
@@ -1691,19 +1691,11 @@ function initVolumeUI(){
     setSliderFill(musicSlider,musicSlider.value);
     updateMusicVolume();
   });
-  muteBtn?.addEventListener('click',()=>{
-    _muted=!_muted; localStorage.setItem(MUTE_KEY,_muted);
-    muteBtn.classList.toggle('active',_muted);
-    muteBtn.textContent=_muted?'🔇 Unmute':'🔇 Mute All';
-    if(musicBtn) musicBtn.classList.toggle('active',_musicOn&&!_muted);
-    updateMusicVolume();
-    if(!_muted) SFX.click();
-  });
   musicBtn?.addEventListener('click',()=>{
     _musicOn=!_musicOn; localStorage.setItem(MUSIC_ON_KEY,_musicOn);
-    musicBtn.classList.toggle('active',_musicOn&&!_muted);
+    musicBtn.classList.toggle('active',_musicOn);
     musicBtn.textContent=_musicOn?'🎵 Music On':'🎵 Music Off';
-    if(_musicOn&&!_muted) startMusic(); else stopMusic();
+    if(_musicOn) startMusic(); else stopMusic();
   });
 }
 
