@@ -95,7 +95,7 @@ const SFX = {
   drop()    { playTone(80,0.12,'sawtooth',0.22); },
   click()   { playTone(600,0.03,'square',0.12); },
   clear(n)  { [523,659,784,1047].slice(0,n).forEach((f,i)=>playTone(f,0.12,'triangle',0.20,i*0.08)); },
-  tetris()  { [523,659,784,1047,784,1047,1319].forEach((f,i)=>playTone(f,0.14,'triangle',0.22,i*0.10)); },
+  blockDrop(){ [523,659,784,1047,784,1047,1319].forEach((f,i)=>playTone(f,0.14,'triangle',0.22,i*0.10)); },
   gameOver(){ [400,320,240,160].forEach((f,i)=>playTone(f,0.18,'sawtooth',0.20,i*0.18)); },
   revive()  { [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50].forEach((f,i)=>playTone(f,0.10,'triangle',0.22,i*0.045)); },
 };
@@ -108,7 +108,7 @@ const HAP = {
   land()    { vibrate(20); },
   drop()    { vibrate(30); },
   clear()   { vibrate([40,20,40]); },
-  tetris()  { vibrate([60,30,60,30,100]); },
+  blockDrop(){ vibrate([60,30,60,30,100]); },
   gameOver(){ vibrate([80,40,80,40,200]); },
   revive()  { vibrate([50,40,70]); },
 };
@@ -488,7 +488,7 @@ function clearLines() {
     score+=(LINE_SCORES[cleared]||800)*level;
     lines+=cleared; level=Math.floor(lines/10)+1;
     updateUI();
-    if(cleared===4){SFX.tetris();HAP.tetris();}
+    if(cleared===4){SFX.blockDrop();HAP.blockDrop();}
     else{SFX.clear(cleared);HAP.clear();}
     // Trigger visual effects
     fxLineClear(clearedRows, cleared);
@@ -539,8 +539,8 @@ function fxLineClear(rows, count) {
   // 3. Show score popup
   fxScorePopup(count);
 
-  // 4. TETRIS label
-  if (count === 4) fxTetrisLabel();
+  // 4. BLOCK DROP celebration label
+  if (count === 4) fxBlockDropLabel();
 
   // 5. Start particle loop if not already running
   if (!_fxRaf) _fxRaf = requestAnimationFrame(fxLoop);
@@ -585,7 +585,7 @@ function fxScorePopup(count) {
   if (!wrap) return;
 
   const pts    = [0, 100, 300, 500, 800][Math.min(count, 4)] * level;
-  const labels = ['','Single!','Double!','Triple!','TETRIS!!!'];
+  const labels = ['','Single!','Double!','Triple!','BLOCK DROP!!!'];
   const colors = ['','#00f0f0','#00ff88','#ffcc00','#ff8800'];
 
   const el = document.createElement('div');
@@ -597,12 +597,12 @@ function fxScorePopup(count) {
   setTimeout(() => el.remove(), 1200);
 }
 
-function fxTetrisLabel() {
+function fxBlockDropLabel() {
   const wrap = canvas.parentElement;
   if (!wrap) return;
   const el = document.createElement('div');
-  el.className = 'tetris-label';
-  el.textContent = 'TETRIS!';
+  el.className = 'blockdrop-label';
+  el.textContent = 'BLOCK DROP!';
   wrap.appendChild(el);
   setTimeout(() => el.remove(), 1500);
 }
@@ -1320,9 +1320,8 @@ SFX.rotate  = ()  => playToneScaled(440,0.06,'triangle',0.14);
 SFX.land    = ()  => playToneScaled(110,0.08,'square',0.18);
 SFX.drop    = ()  => playToneScaled(80,0.12,'sawtooth',0.22);
 SFX.click   = ()  => playToneScaled(600,0.03,'square',0.12);
-SFX.clear   = n   => [523,659,784,1047].slice(0,n).forEach((f,i)=>playToneScaled(f,0.12,'triangle',0.20,i*0.08));
-SFX.tetris  = ()  => [523,659,784,1047,784,1047,1319].forEach((f,i)=>playToneScaled(f,0.14,'triangle',0.22,i*0.10));
-SFX.gameOver= ()  => [400,320,240,160].forEach((f,i)=>playToneScaled(f,0.18,'sawtooth',0.20,i*0.18));
+SFX.blockDrop = ()  => [523,659,784,1047,784,1047,1319].forEach((f,i)=>playToneScaled(f,0.14,'triangle',0.22,i*0.10));
+SFX.gameOver  = ()  => [400,320,240,160].forEach((f,i)=>playToneScaled(f,0.18,'sawtooth',0.20,i*0.18));
 
 function startMusic(){
   if(!_musicOn||_muted) return;
@@ -1713,7 +1712,7 @@ const ONBOARDING_KEY = 'bd_onboarding_done';
 function hasCompletedOnboarding(){ return !!localStorage.getItem(ONBOARDING_KEY); }
 
 // ── STEP 1 — Mobile Demo Canvas ───────────────
-// Mini Tetris scene with animated bot + gesture hand
+// Mini Block Drop scene with animated bot + gesture hand
 
 const OD_COLS=6, OD_ROWS=10, OD_B=16; // logical block size — canvas is css-scaled
 

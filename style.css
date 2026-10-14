@@ -2269,8 +2269,8 @@ body.in-menu #gameCanvas {
 .htp-score-row span   { color: #666; font-family: 'Courier New', monospace; }
 .htp-score-row strong { color: #00f0f0; font-family: 'Courier New', monospace; }
 
-.htp-tetris-row span   { color: #ffcc44; }
-.htp-tetris-row strong { color: #ffcc44; font-size: 13px; }
+.htp-blockdrop-row span   { color: #ffcc44; }
+.htp-blockdrop-row strong { color: #ffcc44; font-size: 13px; }
 
 /* Close button */
 .htp-close-btn {
@@ -3268,8 +3268,8 @@ body.in-menu #gameCanvas {
   100% { opacity: 0;   transform: translateX(-50%) translateY(-70px)  scale(0.8); }
 }
 
-/* TETRIS label */
-.tetris-label {
+/* BLOCK DROP celebration label */
+.blockdrop-label {
   position: absolute;
   left: 50%; top: 40%;
   transform: translateX(-50%);
@@ -3281,10 +3281,10 @@ body.in-menu #gameCanvas {
   pointer-events: none;
   z-index: 20;
   letter-spacing: 4px;
-  animation: tetrisLabel 1.4s ease-out forwards;
+  animation: blockDropLabel 1.4s ease-out forwards;
 }
 
-@keyframes tetrisLabel {
+@keyframes blockDropLabel {
   0%   { opacity: 0; transform: translateX(-50%) scale(0.5); }
   20%  { opacity: 1; transform: translateX(-50%) scale(1.2); }
   60%  { opacity: 1; transform: translateX(-50%) scale(1);   }

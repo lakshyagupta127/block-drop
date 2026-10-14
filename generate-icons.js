@@ -19,7 +19,7 @@ function generateIcon(size) {
   ctx.roundRect(0, 0, size, size, size * 0.18);
   ctx.fill();
 
-  // Draw Tetris blocks forming a "BD" shape
+  // Draw Block Drop blocks forming a "BD" shape
   const b  = Math.floor(size / 8);   // block size
   const gap= Math.floor(b * 0.08);   // gap between blocks
 

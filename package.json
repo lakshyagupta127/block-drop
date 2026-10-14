@@ -1,7 +1,7 @@
 {
   "name": "block-drop",
   "version": "2.0.0",
-  "description": "Block Drop — Tetris game with secure backend, JWT admin, HMAC score signing",
+  "description": "Block Drop — Block drop puzzle game with secure backend, JWT admin, HMAC score signing",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

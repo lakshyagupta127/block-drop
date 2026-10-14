@@ -1,16 +1,16 @@
 # 🎮 Block Drop
 
-A fully-featured, production-ready Tetris-style puzzle game built with **Node.js**, **Express**, **SQLite**, and vanilla **JavaScript**. Designed for mobile and desktop with a global leaderboard, multilingual support, secure backend, and a complete onboarding experience.
+A fully-featured, production-ready block drop arcade puzzle game built with **Node.js**, **Express**, **PostgreSQL**, and vanilla **JavaScript**. Designed for mobile and desktop with a global leaderboard, multilingual support, secure backend, and a complete onboarding experience.
 
 ---
 
 ## ✨ Features
 
 ### Game
-- Classic Tetris gameplay with all 7 tetrominoes
+- Classic block drop gameplay with all 7 piece shapes
 - Ghost piece (landing preview)
 - Exponential speed curve — levels 1–15, max speed at 35ms/drop
-- Line clear visual effects — particles, flash, score popup, TETRIS! label
+- Line clear visual effects — particles, flash, score popup, BLOCK DROP! celebration banner
 - Background music (generative, no audio files) + SFX
 - Volume controls, mute, music on/off
 
@@ -102,7 +102,7 @@ SCORE_SECRET=your_score_secret_here
 ADMIN_PASSWORD=your_admin_password_here
 NODE_ENV=development
 PORT=3000
-DB_FILE=./tetris.db
+DATABASE_URL=postgresql://localhost/blockdrop
 ```
 
 ---
@@ -119,7 +119,7 @@ JWT_SECRET      = (your secret)
 SCORE_SECRET    = (your secret)
 ADMIN_PASSWORD  = (your password)
 NODE_ENV        = production
-DB_FILE         = /data/tetris.db
+DATABASE_URL    = (your postgres database url)
 PORT            = 3000
 ```
 
