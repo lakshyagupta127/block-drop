@@ -1267,10 +1267,86 @@ function updateReviveButtonUI(state) {
     if (lbl) lbl.textContent = 'REVIVE';
     btn.title = 'Revive (Available for 10s on Game Over)';
   }
-}
+// ── Google AdMob Controller ──
+const AdMobManager = {
+  appId: 'ca-app-pub-8122097857797560~6769216530',
+  rewardedAdId: 'ca-app-pub-8122097857797560/7568127036',
+  isInitialized: false,
+  isPrepared: false,
+  adPlugin: null,
 
-function triggerRevive() {
-  if (_reviveSecondsLeft <= 0 || _hasRevivedThisGame) return;
+  async init() {
+    try {
+      if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins && window.Capacitor.Plugins.AdMob) {
+        this.adPlugin = window.Capacitor.Plugins.AdMob;
+        await this.adPlugin.initialize({
+          requestTrackingAuthorization: true,
+          initializeForTesting: false
+        });
+        this.isInitialized = true;
+        this.setupListeners();
+        this.preloadRewarded();
+        console.log('[AdMob] Initialized successfully');
+      }
+    } catch (e) {
+      console.warn('[AdMob] Init:', e);
+    }
+  },
+
+  setupListeners() {
+    if (!this.adPlugin) return;
+    try {
+      this.adPlugin.addListener('onRewardedVideoAdReward', () => {
+        console.log('[AdMob] Rewarded completed - executing revive!');
+        triggerRevive(true);
+      });
+      this.adPlugin.addListener('onRewardedVideoAdDismissed', () => {
+        this.preloadRewarded();
+      });
+      this.adPlugin.addListener('onRewardedVideoAdFailedToLoad', (err) => {
+        console.warn('[AdMob] Ad load failed:', err);
+        this.isPrepared = false;
+      });
+    } catch (_) {}
+  },
+
+  async preloadRewarded() {
+    if (!this.adPlugin) return;
+    try {
+      await this.adPlugin.prepareRewardVideoAd({
+        adId: this.rewardedAdId,
+        isTesting: false
+      });
+      this.isPrepared = true;
+    } catch (e) {
+      this.isPrepared = false;
+    }
+  },
+
+  async requestReviveWithAd() {
+    if (_hasRevivedThisGame || _reviveSecondsLeft <= 0) return;
+
+    if (this.adPlugin && this.isInitialized) {
+      if (_reviveInterval) {
+        clearInterval(_reviveInterval);
+        _reviveInterval = null;
+      }
+      try {
+        await this.adPlugin.showRewardVideoAd();
+        return;
+      } catch (err) {
+        console.warn('[AdMob] Show ad failed, granting revive directly:', err);
+        triggerRevive(true);
+      }
+    } else {
+      triggerRevive();
+    }
+  }
+};
+
+function triggerRevive(force = false) {
+  if (!force && (_reviveSecondsLeft <= 0 || _hasRevivedThisGame)) return;
+  if (_hasRevivedThisGame) return;
 
   // 1. Mark used & stop timer
   _hasRevivedThisGame = true;
@@ -1596,7 +1672,7 @@ function showGameOverOverlay(rank, bestScore) {
     <button class="retro-btn secondary" id="goLbBtn">🏆 Leaderboard</button>
     <button class="retro-btn secondary" id="goMenuBtn">🏠 Return to Menu</button>
   `);
-  document.getElementById('overlayReviveBtn')?.addEventListener('click', triggerRevive);
+  document.getElementById('overlayReviveBtn')?.addEventListener('click', () => AdMobManager.requestReviveWithAd());
   document.getElementById('restartBtn').addEventListener('click', startGame);
   document.getElementById('goLbBtn').addEventListener('click', openLB);
   document.getElementById('goMenuBtn').addEventListener('click', returnToMenu);
@@ -2077,7 +2153,8 @@ window.endGame = function endGame(){
 (async function init(){
   loadSavedCountry();
   await loadPlayerProfile();
-  document.getElementById('reviveBtn')?.addEventListener('click', triggerRevive);
+  document.getElementById('reviveBtn')?.addEventListener('click', () => AdMobManager.requestReviveWithAd());
+  AdMobManager.init();
 })();
 
 // ── Pause button keyboard shortcut ─────────────
