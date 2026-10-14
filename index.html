@@ -225,18 +225,13 @@
         <div id="nameChangeForm">
           <input type="text" id="settingsNameInput" maxlength="20"
             data-i18n="name_placeholder" placeholder="Enter new name" autocomplete="off" spellcheck="false"/>
-          <div class="name-rules" data-i18n="name_rules">2–20 characters</div>
-          <button class="retro-btn settings-save-btn" id="saveNameBtn" data-i18n="save_name">✔ Save Name</button>
+          <div class="name-rules">2–20 characters • Change anytime by watching a quick ad</div>
+          <button class="retro-btn settings-save-btn" id="saveNameBtn">
+            <span class="ad-badge">AD</span> 📺 <span>Watch Ad to Change Name</span>
+          </button>
           <div class="settings-msg" id="settingsMsg"></div>
         </div>
-        <div id="nameCooldownNotice" style="display:none">
-          <div class="cooldown-box">
-            <div class="cooldown-icon">🔒</div>
-            <div class="cooldown-text"><span data-i18n="name_locked">Name locked for</span> <strong id="cooldownDaysLeft">—</strong> <span data-i18n="more_days">more day(s)</span></div>
-            <div class="cooldown-date"><span data-i18n="next_change">Next change:</span> <span id="cooldownNextDate">—</span></div>
-            <div class="cooldown-bar-wrap"><div class="cooldown-bar-fill" id="cooldownBarFill"></div></div>
-          </div>
-        </div>
+        <div id="nameCooldownNotice" style="display:none"></div>
       </div>
 
       <!-- Volume section -->
@@ -387,7 +382,7 @@
         </div>
         <div class="onboard-avatar">🧑‍🎮</div>
         <h2 class="onboard-title">Choose Your Name</h2>
-        <p class="onboard-sub">This appears on the leaderboard. You <strong>must enter a name</strong> to play. You can change it once every 10 days.</p>
+        <p class="onboard-sub">This appears on the leaderboard. You <strong>must enter a name</strong> to play. You can change it anytime in Settings by watching an ad.</p>
       </div>
 
       <div class="onboard-name-wrap">

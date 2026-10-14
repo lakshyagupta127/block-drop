@@ -372,8 +372,8 @@ app.post('/api/scores', scoreLimiter, async (req, res) => {
 //  PLAYER SETTINGS
 // ══════════════════════════════════════════════════
 
-const NAME_COOLDOWN_DAYS = 10;
-const NAME_COOLDOWN_MS   = NAME_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
+const NAME_COOLDOWN_DAYS = 0;
+const NAME_COOLDOWN_MS   = 0;
 
 // GET /api/player/stats
 app.get('/api/player/stats', async (req, res) => {
@@ -423,15 +423,10 @@ app.get('/api/player', async (req, res) => {
     let pRes = await query('SELECT * FROM players WHERE fingerprint = $1', [fp]);
     if (pRes.rows.length === 0) {
       await query('INSERT INTO players (fingerprint, name) VALUES ($1, $2)', [fp, 'Player']);
-      return res.json({ success: true, name: 'Player', canChangeName: true, nextChangeAt: null, cooldownDays: NAME_COOLDOWN_DAYS });
+      return res.json({ success: true, name: 'Player', canChangeName: true, nextChangeAt: null, cooldownDays: 0 });
     }
-    const player      = pRes.rows[0];
-    const lastChanged = player.name_changed_at ? new Date(player.name_changed_at).getTime() : null;
-    const now         = Date.now();
-    const canChange   = !lastChanged || (now - lastChanged) >= NAME_COOLDOWN_MS;
-    const nextChangeAt= lastChanged && !canChange
-      ? new Date(lastChanged + NAME_COOLDOWN_MS).toISOString() : null;
-    res.json({ success: true, name: player.name, canChangeName: canChange, nextChangeAt, cooldownDays: NAME_COOLDOWN_DAYS });
+    const player = pRes.rows[0];
+    res.json({ success: true, name: player.name, canChangeName: true, nextChangeAt: null, cooldownDays: 0 });
   } catch (err) {
     console.error('GET /api/player:', err.message);
     res.status(500).json({ success: false, error: 'Failed to load player' });
@@ -439,7 +434,7 @@ app.get('/api/player', async (req, res) => {
 });
 
 // POST /api/player/name
-app.post('/api/player/name', rateLimit({ windowMs: 60*1000, max: 5 }), async (req, res) => {
+app.post('/api/player/name', rateLimit({ windowMs: 60*1000, max: 10 }), async (req, res) => {
   const { fp, name } = req.body || {};
   if (!fp || typeof fp !== 'string')
     return res.status(400).json({ success: false, error: 'fingerprint required' });
@@ -451,46 +446,33 @@ app.post('/api/player/name', rateLimit({ windowMs: 60*1000, max: 5 }), async (re
 
   if (cleanName.length < 2)
     return res.status(400).json({ success: false, error: 'Name must be at least 2 characters' });
+  if (cleanName.length > 20)
+    return res.status(400).json({ success: false, error: 'Name cannot exceed 20 characters' });
   if (/<|>|;|--|\/\*/.test(cleanName))
     return res.status(400).json({ success: false, error: 'Invalid characters in name' });
 
   try {
-    const pRes  = await query('SELECT * FROM players WHERE fingerprint = $1', [cleanFp]);
-    const now   = Date.now();
+    const pRes = await query('SELECT * FROM players WHERE fingerprint = $1', [cleanFp]);
 
     if (pRes.rows.length === 0) {
       await query(
         'INSERT INTO players (fingerprint, name, name_changed_at) VALUES ($1, $2, NOW())',
         [cleanFp, cleanName]
       );
-      return res.json({
-        success: true, name: cleanName, canChangeName: false,
-        nextChangeAt: new Date(now + NAME_COOLDOWN_MS).toISOString(),
-        cooldownDays: NAME_COOLDOWN_DAYS, message: 'Name set successfully',
-      });
+    } else {
+      await query(
+        'UPDATE players SET name=$1, name_changed_at=NOW() WHERE fingerprint=$2',
+        [cleanName, cleanFp]
+      );
     }
 
-    const player      = pRes.rows[0];
-    const lastChanged = player.name_changed_at ? new Date(player.name_changed_at).getTime() : null;
-    const elapsed     = lastChanged ? (now - lastChanged) : NAME_COOLDOWN_MS + 1;
-
-    if (elapsed < NAME_COOLDOWN_MS) {
-      const nextChangeAt = new Date(lastChanged + NAME_COOLDOWN_MS).toISOString();
-      const daysLeft     = Math.ceil((NAME_COOLDOWN_MS - elapsed) / (24*60*60*1000));
-      return res.status(429).json({
-        success: false, canChangeName: false, nextChangeAt, daysLeft,
-        error: `Name can only be changed once every ${NAME_COOLDOWN_DAYS} days`,
-      });
-    }
-
-    await query(
-      'UPDATE players SET name=$1, name_changed_at=NOW() WHERE fingerprint=$2',
-      [cleanName, cleanFp]
-    );
     res.json({
-      success: true, name: cleanName, canChangeName: false,
-      nextChangeAt: new Date(now + NAME_COOLDOWN_MS).toISOString(),
-      cooldownDays: NAME_COOLDOWN_DAYS, message: 'Name updated successfully',
+      success: true,
+      name: cleanName,
+      canChangeName: true,
+      nextChangeAt: null,
+      cooldownDays: 0,
+      message: 'Name updated successfully',
     });
   } catch (err) {
     console.error('POST /api/player/name:', err.message);

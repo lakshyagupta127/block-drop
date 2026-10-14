@@ -32,7 +32,7 @@ A fully-featured, production-ready block drop arcade puzzle game built with **No
 - Browser fingerprint identity (no login required)
 - Personal best score, total games, last session stats
 - "Welcome back!" greeting on return visits
-- Display name with 10-day change cooldown (enforced server-side)
+- Display name changes unlocked via rewarded video ads
 
 ### Leaderboard
 - Global top 10 scores

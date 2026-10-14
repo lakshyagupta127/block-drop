@@ -308,31 +308,25 @@ function openSettings() {
   if (curEl) curEl.textContent = _playerName || 'Player';
   if (msgEl) { msgEl.textContent=''; msgEl.className='settings-msg'; }
   const inp = document.getElementById('settingsNameInput');
-  if (inp) inp.value = (_playerName && _playerName !== 'Player') ? _playerName : '';
-  if (_canChangeName) {
-    if (form) form.style.display='flex';
-    if (lock) lock.style.display='none';
-  } else {
-    if (form) form.style.display='none';
-    if (lock) { lock.style.display='block'; renderCooldown(); }
-  }
+  if (inp) inp.value = '';
+  if (form) form.style.display='flex';
+  if (lock) lock.style.display='none';
+  resetSaveNameBtn();
   modal.style.display='flex';
   modal.style.zIndex='100000';
-  if (inp && _canChangeName) setTimeout(()=>inp.focus(),100);
+  if (inp) setTimeout(()=>inp.focus(),100);
 }
 
 function renderCooldown() {
-  if (!_nextChangeAt) return;
-  const now=Date.now(), next=new Date(_nextChangeAt).getTime();
-  const total=10*24*60*60*1000, remaining=Math.max(0,next-now);
-  const daysLeft=Math.ceil(remaining/(24*60*60*1000));
-  const progress=Math.min(100,Math.round(((total-remaining)/total)*100));
-  const daysEl=document.getElementById('cooldownDaysLeft');
-  const dateEl=document.getElementById('cooldownNextDate');
-  const barEl =document.getElementById('cooldownBarFill');
-  if (daysEl) daysEl.textContent=daysLeft;
-  if (dateEl) dateEl.textContent=new Date(_nextChangeAt).toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
-  if (barEl)  barEl.style.width=progress+'%';
+  // Cooldown replaced by rewarded ad unlock
+}
+
+function resetSaveNameBtn() {
+  const btn = document.getElementById('saveNameBtn');
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="ad-badge">AD</span> 📺 <span>Watch Ad to Change Name</span>';
+  }
 }
 
 function closeSettings() {
@@ -344,41 +338,65 @@ function closeSettings() {
 async function saveSettingsName() {
   const inp   = document.getElementById('settingsNameInput');
   const msgEl = document.getElementById('settingsMsg');
-  const btn   = document.getElementById('saveNameBtn');
-  const newName = (inp?.value||'').trim();
+  const newName = (inp?.value || '').trim();
   if (!newName || newName.length < 2) {
     if (msgEl) { msgEl.textContent='Name must be at least 2 characters.'; msgEl.className='settings-msg error'; }
+    inp?.focus();
+    return;
+  }
+  if (newName.length > 20) {
+    if (msgEl) { msgEl.textContent='Name cannot exceed 20 characters.'; msgEl.className='settings-msg error'; }
+    inp?.focus();
+    return;
+  }
+  if (/<|>|;|--|\/\*/.test(newName)) {
+    if (msgEl) { msgEl.textContent='Invalid characters in name.'; msgEl.className='settings-msg error'; }
+    inp?.focus();
+    return;
+  }
+  if (newName === _playerName) {
+    if (msgEl) { msgEl.textContent='This is already your current name.'; msgEl.className='settings-msg error'; }
     return;
   }
   if (!_playerFp) {
     if (msgEl) { msgEl.textContent='Could not identify player. Refresh and try again.'; msgEl.className='settings-msg error'; }
     return;
   }
-  btn.disabled=true; btn.textContent='⏳ Saving…';
   if (msgEl) { msgEl.textContent=''; msgEl.className='settings-msg'; }
+
+  AdMobManager.requestNameChangeWithAd(newName);
+}
+
+async function commitSettingsName(newName) {
+  const msgEl = document.getElementById('settingsMsg');
+  const btn   = document.getElementById('saveNameBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Updating…'; }
   try {
-    const res  = await fetch('/api/player/name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fp:_playerFp,name:newName})});
+    const res  = await fetch('/api/player/name', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fp: _playerFp, name: newName })
+    });
     const data = await res.json();
     if (data.success) {
-      _playerName=data.name; _canChangeName=data.canChangeName; _nextChangeAt=data.nextChangeAt;
+      _playerName = data.name;
+      _canChangeName = true;
       localStorage.setItem(PLAYER_NAME_KEY, _playerName);
-      updatePlayerUI(); SFX.clear(1);
-      const curEl=document.getElementById('settingsCurrentName');
-      if (curEl) curEl.textContent=_playerName;
-      if (msgEl) { msgEl.textContent='✔ Name saved!'; msgEl.className='settings-msg success'; }
-      setTimeout(()=>{
-        document.getElementById('nameChangeForm').style.display='none';
-        const lock=document.getElementById('nameCooldownNotice');
-        if (lock) { lock.style.display='block'; renderCooldown(); }
-      },1200);
+      updatePlayerUI();
+      if (typeof SFX !== 'undefined' && SFX.clear) SFX.clear(1);
+      const curEl = document.getElementById('settingsCurrentName');
+      if (curEl) curEl.textContent = _playerName;
+      if (msgEl) { msgEl.textContent = '✔ Name updated!'; msgEl.className = 'settings-msg success'; }
+      AdMobManager.showNotice('✔ NAME UPDATED', `Display name is now ${_playerName}`);
+      const inp = document.getElementById('settingsNameInput');
+      if (inp) inp.value = '';
     } else {
-      if (msgEl) { msgEl.textContent=data.error||'Failed to save.'; msgEl.className='settings-msg error'; }
-      if (data.nextChangeAt) { _canChangeName=false; _nextChangeAt=data.nextChangeAt; }
+      if (msgEl) { msgEl.textContent = data.error || 'Failed to save.'; msgEl.className = 'settings-msg error'; }
     }
-  } catch {
-    if (msgEl) { msgEl.textContent='Server error. Try again.'; msgEl.className='settings-msg error'; }
+  } catch (err) {
+    if (msgEl) { msgEl.textContent = 'Network or server error. Try again.'; msgEl.className = 'settings-msg error'; }
   } finally {
-    btn.disabled=false; btn.textContent='✔ Save Name';
+    resetSaveNameBtn();
   }
 }
 
@@ -1285,6 +1303,8 @@ function updateReviveButtonUI(state) {
     if (lbl) lbl.textContent = 'REVIVE';
     btn.title = 'Revive (Available for 10s on Game Over)';
   }
+}
+
 // ── Google AdMob Controller ──
 const AdMobManager = {
   appId: 'ca-app-pub-8122097857797560~6769216530',
@@ -1293,6 +1313,8 @@ const AdMobManager = {
   isPrepared: false,
   adPlugin: null,
   rewardGranted: false,
+  pendingAction: null,
+  pendingName: null,
 
   async init() {
     try {
@@ -1327,22 +1349,37 @@ const AdMobManager = {
     if (!this.adPlugin) return;
     try {
       this.adPlugin.addListener('onRewardedVideoAdReward', () => {
-        console.log('[AdMob] Rewarded completed - granting revive!');
+        console.log('[AdMob] Rewarded completed! Action:', this.pendingAction);
         this.rewardGranted = true;
-        triggerRevive(true);
+        if (this.pendingAction === 'revive') {
+          triggerRevive(true);
+        } else if (this.pendingAction === 'nameChange' && this.pendingName) {
+          commitSettingsName(this.pendingName);
+        }
       });
       this.adPlugin.addListener('onRewardedVideoAdDismissed', () => {
         if (!this.rewardGranted) {
-          // Player dismissed without completing ad -> DO NOT REVIVE!
-          this.showNotice('⚠️ AD NOT COMPLETED', 'WATCH FULL AD TO REVIVE');
-          resumeReviveCountdown();
+          // Player dismissed without completing ad
+          if (this.pendingAction === 'nameChange') {
+            this.showNotice('⚠️ AD NOT COMPLETED', 'WATCH FULL AD TO CHANGE NAME');
+            resetSaveNameBtn();
+          } else {
+            this.showNotice('⚠️ AD NOT COMPLETED', 'WATCH FULL AD TO REVIVE');
+            resumeReviveCountdown();
+          }
         }
         this.rewardGranted = false;
+        this.pendingAction = null;
+        this.pendingName = null;
         this.preloadRewarded();
       });
       this.adPlugin.addListener('onRewardedVideoAdFailedToLoad', (err) => {
         console.warn('[AdMob] Ad load failed:', err);
         this.isPrepared = false;
+        if (this.pendingAction === 'nameChange') {
+          this.showNotice('⚠️ AD FAILED TO LOAD', 'PLEASE CHECK NETWORK & TRY AGAIN');
+          resetSaveNameBtn();
+        }
       });
     } catch (_) {}
   },
@@ -1372,6 +1409,8 @@ const AdMobManager = {
 
     if (this.adPlugin && this.isInitialized) {
       this.rewardGranted = false;
+      this.pendingAction = 'revive';
+      this.pendingName = null;
 
       // Pause countdown while ad is displayed
       if (_reviveInterval) {
@@ -1385,12 +1424,53 @@ const AdMobManager = {
         console.warn('[AdMob] Ad show failed:', err);
         this.showNotice('⚠️ AD FAILED TO LOAD', 'PLEASE CHECK NETWORK & TRY AGAIN');
         if (typeof SFX !== 'undefined' && SFX.collision) SFX.collision();
+        this.pendingAction = null;
         resumeReviveCountdown();
         return; // STRICT: DO NOT REVIVE
       }
     } else {
       // In browser: if offline, already blocked above. If online, allow direct revive
       triggerRevive();
+    }
+  },
+
+  async requestNameChangeWithAd(newName) {
+    // 1. Strict check: Internet connection
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      this.showNotice('⚠️ NO INTERNET', 'CONNECT TO INTERNET TO CHANGE NAME');
+      if (typeof SFX !== 'undefined' && SFX.collision) SFX.collision();
+      const msgEl = document.getElementById('settingsMsg');
+      if (msgEl) { msgEl.textContent = '⚠️ Connect to internet to change name.'; msgEl.className = 'settings-msg error'; }
+      return; // STRICT: DO NOT CHANGE NAME
+    }
+
+    const saveBtn = document.getElementById('saveNameBtn');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = '⏳ Loading Ad…';
+    }
+
+    if (this.adPlugin && this.isInitialized) {
+      this.rewardGranted = false;
+      this.pendingAction = 'nameChange';
+      this.pendingName = newName;
+
+      try {
+        await this.adPlugin.showRewardVideoAd();
+      } catch (err) {
+        console.warn('[AdMob] Name change ad show failed:', err);
+        this.showNotice('⚠️ AD FAILED TO LOAD', 'PLEASE CHECK NETWORK & TRY AGAIN');
+        if (typeof SFX !== 'undefined' && SFX.collision) SFX.collision();
+        const msgEl = document.getElementById('settingsMsg');
+        if (msgEl) { msgEl.textContent = '⚠️ Ad failed to load. Please try again.'; msgEl.className = 'settings-msg error'; }
+        this.pendingAction = null;
+        this.pendingName = null;
+        resetSaveNameBtn();
+        return; // STRICT: DO NOT CHANGE NAME
+      }
+    } else {
+      // In web browser (non-Capacitor): save directly if online
+      commitSettingsName(newName);
     }
   }
 };

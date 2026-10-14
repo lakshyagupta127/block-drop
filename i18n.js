@@ -74,7 +74,7 @@ const T = {
     current:              'Current:',
     name_placeholder:     'Enter new name',
     name_rules:           '2–20 characters',
-    save_name:            '✔ Save Name',
+    save_name:            'Watch Ad to Change Name',
     name_locked:          'Name locked for',
     more_days:            'more day(s)',
     next_change:          'Next change:',
