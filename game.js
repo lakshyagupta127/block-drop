@@ -468,9 +468,26 @@ function isValid(shape,ox,oy) {
 
 function placePiece() {
   const{shape,color,x,y}=currentPiece;
-  for(let r=0;r<shape.length;r++)
-    for(let c=0;c<shape[r].length;c++)
-      if(shape[r][c]&&y+r>=0) board[y+r][x+c]=color;
+  for(let r=0;r<shape.length;r++) {
+    for(let c=0;c<shape[r].length;c++) {
+      if(shape[r][c]&&y+r>=0) {
+        board[y+r][x+c]=color;
+        // Cyber particle placement burst
+        if (typeof spawnCyberParticle === 'function') {
+          for (let k = 0; k < 2; k++) {
+            spawnCyberParticle(
+              (x + c + 0.15 + Math.random() * 0.7) * BLOCK,
+              (y + r) * BLOCK,
+              color,
+              -1.0 - Math.random() * 1.4,
+              1.4 + Math.random() * 1.8,
+              40 + Math.random() * 25
+            );
+          }
+        }
+      }
+    }
+  }
 }
 
 function clearLines() {
@@ -668,11 +685,256 @@ function ghostY() {
   return gy;
 }
 
+// ── Cyber Stardust & Energy Beam System (Nano Banana Cyber VFX) ──
+const cyberParticles = [];
+const MAX_CYBER_PARTICLES = 160;
+
+function hexToRgb(hex) {
+  if (!hex || typeof hex !== 'string') return { r: 255, g: 230, b: 0 };
+  const h = hex.trim();
+  if (h.startsWith('#')) {
+    if (h.length === 4) {
+      return {
+        r: parseInt(h[1] + h[1], 16),
+        g: parseInt(h[2] + h[2], 16),
+        b: parseInt(h[3] + h[3], 16)
+      };
+    }
+    return {
+      r: parseInt(h.slice(1, 3), 16) || 255,
+      g: parseInt(h.slice(3, 5), 16) || 230,
+      b: parseInt(h.slice(5, 7), 16) || 0
+    };
+  }
+  return { r: 255, g: 230, b: 0 };
+}
+
+function spawnCyberParticle(x, y, color, vy, size, maxLife) {
+  if (cyberParticles.length >= MAX_CYBER_PARTICLES) {
+    cyberParticles.shift();
+  }
+  const rgb = hexToRgb(color);
+  cyberParticles.push({
+    x,
+    y,
+    vx: (Math.random() - 0.5) * 0.4,
+    vy: vy !== undefined ? vy : (-0.65 - Math.random() * 0.95),
+    size: size || (1.1 + Math.random() * 2.2),
+    color,
+    rgb,
+    maxLife: maxLife || (40 + Math.random() * 35),
+    life: maxLife || (40 + Math.random() * 35),
+    swayAmp: 0.2 + Math.random() * 0.35,
+    swayFreq: 0.05 + Math.random() * 0.08,
+    swayPhase: Math.random() * Math.PI * 2,
+    twinklePhase: Math.random() * Math.PI * 2,
+    twinkleSpeed: 0.12 + Math.random() * 0.18
+  });
+}
+
+function drawCyberEnergyBeams(context) {
+  context.save();
+
+  // 1. Settled board columns energy beams
+  for (let c = 0; c < COLS; c++) {
+    let topR = -1;
+    for (let r = 0; r < ROWS; r++) {
+      if (board[r][c]) {
+        topR = r;
+        break;
+      }
+    }
+    if (topR > 0) {
+      const blockColor = board[topR][c];
+      const rgb = hexToRgb(blockColor);
+      const yStart = topR * BLOCK;
+      // Fade out over 4-6 blocks upward
+      const yEnd = Math.max(0, (topR - 5) * BLOCK);
+      const height = yStart - yEnd;
+
+      if (height > 0) {
+        // Base column glow
+        const grad = context.createLinearGradient(0, yStart, 0, yEnd);
+        grad.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.16)`);
+        grad.addColorStop(0.4, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.07)`);
+        grad.addColorStop(1, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`);
+
+        context.fillStyle = grad;
+        context.fillRect(c * BLOCK + 1, yEnd, BLOCK - 2, height);
+
+        // Soft diffuse inner core
+        const coreGrad = context.createLinearGradient(0, yStart, 0, yEnd);
+        coreGrad.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.12)`);
+        coreGrad.addColorStop(0.5, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.04)`);
+        coreGrad.addColorStop(1, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`);
+        context.fillStyle = coreGrad;
+        context.fillRect(c * BLOCK + 6, yEnd, BLOCK - 12, height);
+      }
+    }
+  }
+
+  // 2. Active falling piece energy trail / beam
+  if (currentPiece && currentPiece.shape) {
+    const pieceTopByCol = {};
+    for (let r = 0; r < currentPiece.shape.length; r++) {
+      for (let c = 0; c < currentPiece.shape[r].length; c++) {
+        if (currentPiece.shape[r][c]) {
+          const bCol = currentPiece.x + c;
+          const bRow = currentPiece.y + r;
+          if (bCol >= 0 && bCol < COLS) {
+            if (pieceTopByCol[bCol] === undefined || bRow < pieceTopByCol[bCol]) {
+              pieceTopByCol[bCol] = bRow;
+            }
+          }
+        }
+      }
+    }
+
+    const rgb = hexToRgb(currentPiece.color);
+    for (const bColStr in pieceTopByCol) {
+      const col = parseInt(bColStr, 10);
+      const topRow = pieceTopByCol[col];
+      const yStart = topRow * BLOCK;
+      // Shaft extends 7 blocks upwards or to canvas top
+      const yEnd = Math.max(0, (topRow - 7) * BLOCK);
+      const height = yStart - yEnd;
+
+      if (height > 0) {
+        // Base column glow
+        const grad = context.createLinearGradient(0, yStart, 0, yEnd);
+        grad.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.22)`);
+        grad.addColorStop(0.35, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.11)`);
+        grad.addColorStop(1, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`);
+
+        context.fillStyle = grad;
+        context.fillRect(col * BLOCK + 1, yEnd, BLOCK - 2, height);
+
+        // Soft diffuse inner core
+        const coreGrad = context.createLinearGradient(0, yStart, 0, yEnd);
+        coreGrad.addColorStop(0, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.18)`);
+        coreGrad.addColorStop(0.4, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08)`);
+        coreGrad.addColorStop(1, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`);
+        context.fillStyle = coreGrad;
+        context.fillRect(col * BLOCK + 5, yEnd, BLOCK - 10, height);
+      }
+    }
+  }
+
+  context.restore();
+}
+
+function updateAndDrawCyberParticles(context) {
+  // 1. Emit from active piece
+  if (currentPiece && currentPiece.shape && !paused && gameRunning) {
+    const pieceTopByCol = {};
+    for (let r = 0; r < currentPiece.shape.length; r++) {
+      for (let c = 0; c < currentPiece.shape[r].length; c++) {
+        if (currentPiece.shape[r][c]) {
+          const bCol = currentPiece.x + c;
+          const bRow = currentPiece.y + r;
+          if (bCol >= 0 && bCol < COLS) {
+            if (pieceTopByCol[bCol] === undefined || bRow < pieceTopByCol[bCol]) {
+              pieceTopByCol[bCol] = bRow;
+            }
+          }
+        }
+      }
+    }
+    const cols = Object.keys(pieceTopByCol);
+    if (cols.length > 0) {
+      // Spawn 1-2 particles per frame
+      const count = Math.random() < 0.65 ? 2 : 1;
+      for (let k = 0; k < count; k++) {
+        const col = parseInt(cols[Math.floor(Math.random() * cols.length)], 10);
+        const topRow = pieceTopByCol[col];
+        spawnCyberParticle(
+          (col - 0.08 + Math.random() * 1.16) * BLOCK,
+          topRow * BLOCK - Math.random() * 6,
+          currentPiece.color,
+          -0.7 - Math.random() * 1.1,
+          1.1 + Math.random() * 2.3,
+          45 + Math.random() * 35
+        );
+      }
+    }
+  }
+
+  // 2. Ambient emission from top settled blocks on board
+  if (!paused && gameRunning && Math.random() < 0.45) {
+    const settledCols = [];
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS; r++) {
+        if (board[r][c]) {
+          settledCols.push({ c, topR: r, color: board[r][c] });
+          break;
+        }
+      }
+    }
+    if (settledCols.length > 0) {
+      const pick = settledCols[Math.floor(Math.random() * settledCols.length)];
+      spawnCyberParticle(
+        (pick.c - 0.08 + Math.random() * 1.16) * BLOCK,
+        pick.topR * BLOCK - Math.random() * 6,
+        pick.color,
+        -0.4 - Math.random() * 0.75,
+        1.0 + Math.random() * 2.0,
+        40 + Math.random() * 30
+      );
+    }
+  }
+
+  // 3. Update & Render
+  context.save();
+  context.globalCompositeOperation = 'lighter';
+
+  for (let i = cyberParticles.length - 1; i >= 0; i--) {
+    const p = cyberParticles[i];
+    if (!paused) {
+      p.life--;
+      if (p.life <= 0 || p.y < -10) {
+        cyberParticles.splice(i, 1);
+        continue;
+      }
+      p.swayPhase += p.swayFreq;
+      p.twinklePhase += p.twinkleSpeed;
+      p.x += p.vx + Math.sin(p.swayPhase) * p.swayAmp;
+      p.y += p.vy;
+    }
+
+    const progress = p.life / p.maxLife; // 1 -> 0
+    const twinkle = 0.75 + 0.25 * Math.sin(p.twinklePhase);
+    const alpha = Math.max(0, Math.min(1, progress * twinkle));
+
+    // Outer neon glow
+    context.fillStyle = `rgba(${p.rgb.r}, ${p.rgb.g}, ${p.rgb.b}, ${alpha * 0.65})`;
+    context.shadowColor = p.color;
+    context.shadowBlur = 6;
+    context.beginPath();
+    context.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    context.fill();
+
+    // White glistening star core
+    if (p.size >= 1.5) {
+      context.shadowBlur = 2;
+      context.fillStyle = `rgba(255, 255, 255, ${alpha * 0.9})`;
+      context.beginPath();
+      context.arc(p.x, p.y, p.size * 0.42, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+
+  context.restore();
+}
+
 function drawBoard() {
   ctx.fillStyle='#06080e';
   ctx.fillRect(0,0,300,600);
   ctx.strokeStyle='rgba(0, 180, 255, 0.12)'; ctx.lineWidth=0.75;
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) ctx.strokeRect(c*BLOCK,r*BLOCK,BLOCK,BLOCK);
+
+  // Cyber vertical energy beams (settled blocks + active piece)
+  drawCyberEnergyBeams(ctx);
+
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) if(board[r][c]) drawBlock(ctx,c,r,board[r][c]);
   const gy=ghostY();
   if(gy!==currentPiece.y)
@@ -682,6 +944,9 @@ function drawBoard() {
   for(let r=0;r<currentPiece.shape.length;r++)
     for(let c=0;c<currentPiece.shape[r].length;c++)
       if(currentPiece.shape[r][c]) drawBlock(ctx,currentPiece.x+c,currentPiece.y+r,currentPiece.color);
+
+  // Cyber stardust & sparkle particles
+  updateAndDrawCyberParticles(ctx);
 }
 
 function drawNext() {
@@ -707,7 +972,30 @@ function moveDown() {
 }
 
 function hardDrop() {
-  score+=(ghostY()-currentPiece.y)*2; currentPiece.y=ghostY();
+  const origY = currentPiece.y;
+  const targetY = ghostY();
+  score+=(targetY-origY)*2; currentPiece.y=targetY;
+
+  // Trail of sparks along hard drop descent
+  if (typeof spawnCyberParticle === 'function') {
+    for (let dy = origY; dy <= targetY; dy += 2) {
+      for (let r = 0; r < currentPiece.shape.length; r++) {
+        for (let c = 0; c < currentPiece.shape[r].length; c++) {
+          if (currentPiece.shape[r][c] && Math.random() < 0.35) {
+            spawnCyberParticle(
+              (currentPiece.x + c + 0.15 + Math.random() * 0.7) * BLOCK,
+              (dy + r + 0.5) * BLOCK,
+              currentPiece.color,
+              -0.8 - Math.random() * 1.2,
+              1.2 + Math.random() * 1.8,
+              35 + Math.random() * 25
+            );
+          }
+        }
+      }
+    }
+  }
+
   updateUI(); SFX.drop(); HAP.drop();
   placePiece(); clearLines(); spawnPiece();
   lastDrop=performance.now();
@@ -963,6 +1251,7 @@ async function startGame() {
   try{ if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume(); }catch(_){}
   resetReviveState();
   board=createBoard(); score=0; level=1; lines=0;
+  cyberParticles.length = 0;
   paused=false; gameRunning=true;
   updateUI();
   nextPiece=randomPiece(); spawnPiece();
