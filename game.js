@@ -38,9 +38,9 @@ const scoreEls = ['scoreDisplay','scoreDisplay2'].map(id=>document.getElementByI
 const levelEls = ['levelDisplay','levelDisplay2'].map(id=>document.getElementById(id)).filter(Boolean);
 const linesEls = ['linesDisplay','linesDisplay2'].map(id=>document.getElementById(id)).filter(Boolean);
 
-// Apply High-DPI scaling to fix blurry rendering on mobile
+// Apply High-DPI scaling (capped at 2 to ensure 60-120fps on mobile without GPU fill-rate lag)
 function applyHighDPI() {
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
   document.querySelectorAll('canvas').forEach(cvs => {
     const w = parseInt(cvs.getAttribute('width'));
     const h = parseInt(cvs.getAttribute('height'));
@@ -569,6 +569,9 @@ function fxLoop() {
 
   _fxParticles = _fxParticles.filter(p => p.life > 0);
 
+  fxCtx.save();
+  fxCtx.globalCompositeOperation = 'lighter';
+
   _fxParticles.forEach(p => {
     p.x     += p.vx;
     p.y     += p.vy;
@@ -577,17 +580,22 @@ function fxLoop() {
     p.life  -= p.decay;
     p.alpha  = Math.max(0, p.life);
 
-    fxCtx.globalAlpha = p.alpha;
+    const r = p.size * p.life;
+    // Outer soft glow halo
+    fxCtx.globalAlpha = p.alpha * 0.4;
     fxCtx.fillStyle   = p.color;
-    fxCtx.shadowColor = p.color;
-    fxCtx.shadowBlur  = 6;
     fxCtx.beginPath();
-    fxCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    fxCtx.arc(p.x, p.y, r * 1.8, 0, Math.PI * 2);
+    fxCtx.fill();
+
+    // Inner bright spark
+    fxCtx.globalAlpha = p.alpha;
+    fxCtx.beginPath();
+    fxCtx.arc(p.x, p.y, r, 0, Math.PI * 2);
     fxCtx.fill();
   });
 
-  fxCtx.globalAlpha = 1;
-  fxCtx.shadowBlur  = 0;
+  fxCtx.restore();
 
   if (_fxParticles.length > 0) {
     _fxRaf = requestAnimationFrame(fxLoop);
@@ -644,12 +652,12 @@ function showOverlay(html) { overlay.innerHTML=html; overlay.style.display='flex
 // ── Drawing ────────────────────────────────────
 function drawCyberBlock(context,bx,by,color,alpha,bSize){
   context.save();
-  context.globalAlpha=alpha;
   const pad=1.5;
   const size=bSize-pad*2;
   const x=bx+pad, y=by+pad;
 
   // Dark glassy core (straight square corners)
+  context.globalAlpha = alpha;
   context.fillStyle='rgba(8, 12, 22, 0.78)';
   context.fillRect(x,y,size,size);
 
@@ -658,16 +666,17 @@ function drawCyberBlock(context,bx,by,color,alpha,bSize){
   context.globalAlpha=alpha*0.38;
   context.fillRect(x,y,size,size);
 
-  // Glowing perimeter neon stroke (straight square corners)
-  context.globalAlpha=alpha;
+  // Glowing perimeter neon stroke (zero-blur, high-speed dual pass)
   context.strokeStyle=color;
-  context.lineWidth=2;
-  context.shadowColor=color;
-  context.shadowBlur=7;
+  context.lineWidth=3.5;
+  context.globalAlpha=alpha*0.28;
+  context.strokeRect(x,y,size,size);
+
+  context.lineWidth=1.5;
+  context.globalAlpha=alpha;
   context.strokeRect(x,y,size,size);
 
   // Specular reflection highlight streak
-  context.shadowBlur=0;
   context.fillStyle='rgba(255, 255, 255, 0.28)';
   context.fillRect(x+2,y+2,size-4,3);
 
@@ -685,26 +694,29 @@ function ghostY() {
   return gy;
 }
 
-// ── Cyber Stardust & Energy Beam System (Nano Banana Cyber VFX) ──
+// ── Cyber Stardust & Energy Beam System (Nano Banana Cyber VFX - High Performance) ──
 const cyberParticles = [];
-const MAX_CYBER_PARTICLES = 160;
+const MAX_CYBER_PARTICLES = 45;
+
+const _rgbCache = {
+  '#00e5ff': { r: 0, g: 229, b: 255 },
+  '#ffe600': { r: 255, g: 230, b: 0 },
+  '#b800ff': { r: 184, g: 0, b: 255 },
+  '#39ff14': { r: 57, g: 255, b: 20 },
+  '#ff1744': { r: 255, g: 23, b: 68 },
+  '#2979ff': { r: 41, g: 121, b: 255 },
+  '#ff9100': { r: 255, g: 145, b: 0 }
+};
 
 function hexToRgb(hex) {
   if (!hex || typeof hex !== 'string') return { r: 255, g: 230, b: 0 };
+  if (_rgbCache[hex]) return _rgbCache[hex];
   const h = hex.trim();
   if (h.startsWith('#')) {
-    if (h.length === 4) {
-      return {
-        r: parseInt(h[1] + h[1], 16),
-        g: parseInt(h[2] + h[2], 16),
-        b: parseInt(h[3] + h[3], 16)
-      };
-    }
-    return {
-      r: parseInt(h.slice(1, 3), 16) || 255,
-      g: parseInt(h.slice(3, 5), 16) || 230,
-      b: parseInt(h.slice(5, 7), 16) || 0
-    };
+    const r = parseInt(h.length === 4 ? h[1] + h[1] : h.slice(1, 3), 16) || 255;
+    const g = parseInt(h.length === 4 ? h[2] + h[2] : h.slice(3, 5), 16) || 230;
+    const b = parseInt(h.length === 4 ? h[3] + h[3] : h.slice(5, 7), 16) || 0;
+    return (_rgbCache[hex] = { r, g, b });
   }
   return { r: 255, g: 230, b: 0 };
 }
@@ -717,18 +729,18 @@ function spawnCyberParticle(x, y, color, vy, size, maxLife) {
   cyberParticles.push({
     x,
     y,
-    vx: (Math.random() - 0.5) * 0.4,
-    vy: vy !== undefined ? vy : (-0.65 - Math.random() * 0.95),
-    size: size || (1.1 + Math.random() * 2.2),
+    vx: (Math.random() - 0.5) * 0.35,
+    vy: vy !== undefined ? vy : (-0.65 - Math.random() * 0.85),
+    size: size || (1.1 + Math.random() * 1.9),
     color,
     rgb,
-    maxLife: maxLife || (40 + Math.random() * 35),
-    life: maxLife || (40 + Math.random() * 35),
-    swayAmp: 0.2 + Math.random() * 0.35,
-    swayFreq: 0.05 + Math.random() * 0.08,
-    swayPhase: Math.random() * Math.PI * 2,
-    twinklePhase: Math.random() * Math.PI * 2,
-    twinkleSpeed: 0.12 + Math.random() * 0.18
+    maxLife: maxLife || (36 + Math.random() * 30),
+    life: maxLife || (36 + Math.random() * 30),
+    swayAmp: 0.18 + Math.random() * 0.28,
+    swayFreq: 0.05 + Math.random() * 0.07,
+    swayPhase: Math.random() * 6.28,
+    twinklePhase: Math.random() * 6.28,
+    twinkleSpeed: 0.12 + Math.random() * 0.16
   });
 }
 
@@ -912,39 +924,37 @@ function drawCyberEnergyBeams(context) {
 }
 
 function updateAndDrawCyberParticles(context) {
-  // 1. Emit from active piece using smooth position
+  // 1. Emit from active piece using smooth position (throttled for high FPS)
   if (currentPiece && currentPiece.shape && !paused && gameRunning && _smoothBeamX !== null) {
-    const localTopByCol = {};
-    for (let r = 0; r < currentPiece.shape.length; r++) {
-      for (let c = 0; c < currentPiece.shape[r].length; c++) {
-        if (currentPiece.shape[r][c]) {
-          if (localTopByCol[c] === undefined || r < localTopByCol[c]) {
-            localTopByCol[c] = r;
+    if (Math.random() < 0.52) {
+      const localTopByCol = {};
+      for (let r = 0; r < currentPiece.shape.length; r++) {
+        for (let c = 0; c < currentPiece.shape[r].length; c++) {
+          if (currentPiece.shape[r][c]) {
+            if (localTopByCol[c] === undefined || r < localTopByCol[c]) {
+              localTopByCol[c] = r;
+            }
           }
         }
       }
-    }
-    const cols = Object.keys(localTopByCol);
-    if (cols.length > 0) {
-      // Spawn 1-2 particles per frame
-      const count = Math.random() < 0.65 ? 2 : 1;
-      for (let k = 0; k < count; k++) {
+      const cols = Object.keys(localTopByCol);
+      if (cols.length > 0) {
         const locC = parseInt(cols[Math.floor(Math.random() * cols.length)], 10);
         const locR = localTopByCol[locC];
         spawnCyberParticle(
           (_smoothBeamX + locC - 0.08 + Math.random() * 1.16) * BLOCK,
           (_smoothBeamY + locR) * BLOCK - Math.random() * 6,
           currentPiece.color,
-          -0.7 - Math.random() * 1.1,
-          1.1 + Math.random() * 2.3,
-          45 + Math.random() * 35
+          -0.7 - Math.random() * 0.95,
+          1.1 + Math.random() * 2.0,
+          38 + Math.random() * 26
         );
       }
     }
   }
 
   // 2. Ambient emission from top settled blocks on board
-  if (!paused && gameRunning && Math.random() < 0.45) {
+  if (!paused && gameRunning && Math.random() < 0.22) {
     const settledCols = [];
     for (let c = 0; c < COLS; c++) {
       for (let r = 0; r < ROWS; r++) {
@@ -960,14 +970,14 @@ function updateAndDrawCyberParticles(context) {
         (pick.c - 0.08 + Math.random() * 1.16) * BLOCK,
         pick.topR * BLOCK - Math.random() * 6,
         pick.color,
-        -0.4 - Math.random() * 0.75,
-        1.0 + Math.random() * 2.0,
-        40 + Math.random() * 30
+        -0.4 - Math.random() * 0.7,
+        1.0 + Math.random() * 1.8,
+        34 + Math.random() * 24
       );
     }
   }
 
-  // 3. Update & Render
+  // 3. Update & Render (Zero shadowBlur - 100% GPU accelerated lighter composite)
   context.save();
   context.globalCompositeOperation = 'lighter';
 
@@ -983,27 +993,30 @@ function updateAndDrawCyberParticles(context) {
       p.twinklePhase += p.twinkleSpeed;
       p.x += p.vx + Math.sin(p.swayPhase) * p.swayAmp;
       p.y += p.vy;
-      p.vx *= 0.94; // Air friction on lateral momentum from column changes
+      p.vx *= 0.94; // Air friction on lateral momentum
     }
 
     const progress = p.life / p.maxLife; // 1 -> 0
     const twinkle = 0.75 + 0.25 * Math.sin(p.twinklePhase);
     const alpha = Math.max(0, Math.min(1, progress * twinkle));
 
-    // Outer neon glow
-    context.fillStyle = `rgba(${p.rgb.r}, ${p.rgb.g}, ${p.rgb.b}, ${alpha * 0.65})`;
-    context.shadowColor = p.color;
-    context.shadowBlur = 6;
+    // Outer soft glow halo (GPU accelerated lighter composite)
+    context.fillStyle = `rgba(${p.rgb.r}, ${p.rgb.g}, ${p.rgb.b}, ${alpha * 0.32})`;
     context.beginPath();
-    context.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    context.arc(p.x, p.y, p.size * 2.0, 0, 6.283);
+    context.fill();
+
+    // Core bright particle
+    context.fillStyle = `rgba(${p.rgb.r}, ${p.rgb.g}, ${p.rgb.b}, ${alpha * 0.85})`;
+    context.beginPath();
+    context.arc(p.x, p.y, p.size, 0, 6.283);
     context.fill();
 
     // White glistening star core
-    if (p.size >= 1.5) {
-      context.shadowBlur = 2;
-      context.fillStyle = `rgba(255, 255, 255, ${alpha * 0.9})`;
+    if (p.size >= 1.4) {
+      context.fillStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
       context.beginPath();
-      context.arc(p.x, p.y, p.size * 0.42, 0, Math.PI * 2);
+      context.arc(p.x, p.y, p.size * 0.42, 0, 6.283);
       context.fill();
     }
   }
@@ -1014,8 +1027,20 @@ function updateAndDrawCyberParticles(context) {
 function drawBoard() {
   ctx.fillStyle='#06080e';
   ctx.fillRect(0,0,300,600);
-  ctx.strokeStyle='rgba(0, 180, 255, 0.12)'; ctx.lineWidth=0.75;
-  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++) ctx.strokeRect(c*BLOCK,r*BLOCK,BLOCK,BLOCK);
+
+  // Single batched grid path (replaces 200 separate strokeRect calls)
+  ctx.strokeStyle='rgba(0, 180, 255, 0.12)';
+  ctx.lineWidth=0.75;
+  ctx.beginPath();
+  for(let c=1; c<COLS; c++) {
+    const x = c * BLOCK;
+    ctx.moveTo(x, 0); ctx.lineTo(x, 600);
+  }
+  for(let r=1; r<ROWS; r++) {
+    const y = r * BLOCK;
+    ctx.moveTo(0, y); ctx.lineTo(300, y);
+  }
+  ctx.stroke();
 
   // Cyber vertical energy beams (settled blocks + active piece)
   drawCyberEnergyBeams(ctx);
