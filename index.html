@@ -14,7 +14,7 @@
   <link rel="icon" type="image/jpeg" href="/icon.jpg">
   <link rel="apple-touch-icon" href="/icon.jpg">
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="style.css?v=2.4">
+  <link rel="stylesheet" href="style.css?v=2.5">
 </head>
 <body class="in-menu">
 
@@ -127,6 +127,10 @@
       <button class="action-pill-btn pause-pill-btn" id="pauseBtn" title="Pause">
         <span class="action-label">PAUSE</span>
         <span class="action-icon">⏸</span>
+      </button>
+      <button class="action-pill-btn revive-pill-btn" id="reviveBtn" disabled title="Revive (Available for 10s on Game Over)">
+        <span class="action-label" id="reviveLabel">REVIVE</span>
+        <span class="action-icon" id="reviveIcon">⚡</span>
       </button>
       <button class="action-pill-btn restart-pill-btn" id="restartTopBtn" title="Restart">
         <span class="action-label">RESTART</span>
@@ -607,7 +611,7 @@
   </div>
 
   <!-- i18n must load before game.js -->
-  <script src="i18n.js?v=2.4"></script>
-  <script src="game.js?v=2.4"></script>
+  <script src="i18n.js?v=2.5"></script>
+  <script src="game.js?v=2.5"></script>
 </body>
 </html>

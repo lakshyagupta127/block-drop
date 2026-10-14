@@ -57,6 +57,7 @@ const T = {
     press_to_resume:      'Press P to resume',
     // Game over
     game_over:            'GAME OVER',
+    revive:               'Revive',
     play_again:           '▶ Play Again',
     enter_name:           'Enter your name for the leaderboard:',
     save:                 '💾 Save',

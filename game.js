@@ -97,6 +97,7 @@ const SFX = {
   clear(n)  { [523,659,784,1047].slice(0,n).forEach((f,i)=>playTone(f,0.12,'triangle',0.20,i*0.08)); },
   tetris()  { [523,659,784,1047,784,1047,1319].forEach((f,i)=>playTone(f,0.14,'triangle',0.22,i*0.10)); },
   gameOver(){ [400,320,240,160].forEach((f,i)=>playTone(f,0.18,'sawtooth',0.20,i*0.18)); },
+  revive()  { [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50].forEach((f,i)=>playTone(f,0.10,'triangle',0.22,i*0.045)); },
 };
 
 // ── Haptics ────────────────────────────────────
@@ -109,6 +110,7 @@ const HAP = {
   clear()   { vibrate([40,20,40]); },
   tetris()  { vibrate([60,30,60,30,100]); },
   gameOver(){ vibrate([80,40,80,40,200]); },
+  revive()  { vibrate([50,40,70]); },
 };
 
 // ── Device detection ────────────────────────────
@@ -758,10 +760,208 @@ function gameLoop(ts) {
   animFrame=requestAnimationFrame(gameLoop);
 }
 
+// ── Revive System (10-second window on Game Over) ───────────────────
+let _hasRevivedThisGame = false;
+let _reviveSecondsLeft = 0;
+let _reviveInterval = null;
+
+function resetReviveState() {
+  if (_reviveInterval) {
+    clearInterval(_reviveInterval);
+    _reviveInterval = null;
+  }
+  _reviveSecondsLeft = 0;
+  _hasRevivedThisGame = false;
+  updateReviveButtonUI('idle');
+}
+
+function startReviveCountdown() {
+  if (_hasRevivedThisGame) {
+    updateReviveButtonUI('used');
+    return;
+  }
+
+  _reviveSecondsLeft = 10;
+  updateReviveButtonUI('active');
+
+  if (_reviveInterval) clearInterval(_reviveInterval);
+  _reviveInterval = setInterval(() => {
+    _reviveSecondsLeft--;
+    if (_reviveSecondsLeft > 0) {
+      updateReviveButtonUI('active');
+      const timerSpan = document.getElementById('overlayReviveTimer');
+      if (timerSpan) timerSpan.textContent = _reviveSecondsLeft;
+    } else {
+      expireRevive();
+    }
+  }, 1000);
+}
+
+function expireRevive() {
+  if (_reviveInterval) {
+    clearInterval(_reviveInterval);
+    _reviveInterval = null;
+  }
+  _reviveSecondsLeft = 0;
+  updateReviveButtonUI('expired');
+
+  const overlayBtn = document.getElementById('overlayReviveBtn');
+  if (overlayBtn) {
+    overlayBtn.classList.add('is-expired');
+    overlayBtn.disabled = true;
+    overlayBtn.innerHTML = '⚡ REVIVE EXPIRED';
+    setTimeout(() => {
+      overlayBtn.style.transition = 'opacity 0.4s, max-height 0.4s';
+      overlayBtn.style.opacity = '0';
+      overlayBtn.style.maxHeight = '0';
+      overlayBtn.style.padding = '0';
+      overlayBtn.style.margin = '0';
+      setTimeout(() => overlayBtn.remove(), 400);
+    }, 1200);
+  }
+}
+
+function updateReviveButtonUI(state) {
+  const btn = document.getElementById('reviveBtn');
+  const lbl = document.getElementById('reviveLabel');
+  if (!btn) return;
+
+  if (state === 'active') {
+    btn.disabled = false;
+    btn.classList.add('can-revive');
+    btn.classList.remove('is-used', 'is-expired');
+    if (lbl) lbl.textContent = `REVIVE ${_reviveSecondsLeft}s`;
+    btn.title = `Tap to revive! (${_reviveSecondsLeft}s remaining)`;
+  } else if (state === 'used') {
+    btn.disabled = true;
+    btn.classList.remove('can-revive');
+    btn.classList.add('is-used');
+    if (lbl) lbl.textContent = 'USED';
+    btn.title = 'Revive already used this game';
+  } else if (state === 'expired') {
+    btn.disabled = true;
+    btn.classList.remove('can-revive');
+    btn.classList.add('is-expired');
+    if (lbl) lbl.textContent = 'EXPIRED';
+    btn.title = 'Revive window expired';
+  } else {
+    btn.disabled = true;
+    btn.classList.remove('can-revive', 'is-used', 'is-expired');
+    if (lbl) lbl.textContent = 'REVIVE';
+    btn.title = 'Revive (Available for 10s on Game Over)';
+  }
+}
+
+function triggerRevive() {
+  if (_reviveSecondsLeft <= 0 || _hasRevivedThisGame) return;
+
+  // 1. Mark used & stop timer
+  _hasRevivedThisGame = true;
+  if (_reviveInterval) {
+    clearInterval(_reviveInterval);
+    _reviveInterval = null;
+  }
+  _reviveSecondsLeft = 0;
+  updateReviveButtonUI('used');
+
+  // 2. Audio & Haptics
+  if (typeof SFX !== 'undefined' && SFX.revive) SFX.revive();
+  if (typeof HAP !== 'undefined' && HAP.revive) HAP.revive();
+
+  // 3. Remove all blocks in the top 40% area
+  // ROWS = 20. 40% = 8 rows (rows 0 through 7)
+  const top40Rows = Math.floor(ROWS * 0.4);
+  for (let r = 0; r < top40Rows; r++) {
+    board[r] = Array(COLS).fill(0);
+  }
+
+  // 4. Trigger visual revive sweep effect on fxCanvas
+  fxReviveClear(top40Rows);
+
+  // 5. Dismiss Game Over overlay and fallback name modal
+  if (overlay) overlay.style.display = 'none';
+  const nameModal = document.getElementById('nameModal');
+  if (nameModal) nameModal.style.display = 'none';
+
+  // 6. Spawn fresh piece in the cleared top area
+  currentPiece = nextPiece || randomPiece();
+  nextPiece = randomPiece();
+  currentPiece.x = Math.floor((COLS - currentPiece.shape[0].length) / 2);
+  currentPiece.y = 0;
+  drawNext();
+
+  // 7. Resume game loop
+  gameRunning = true;
+  paused = false;
+  lastDrop = performance.now();
+  cancelAnimationFrame(animFrame);
+  animFrame = requestAnimationFrame(gameLoop);
+  syncControlButtons();
+
+  if (typeof _musicOn !== 'undefined' && _musicOn && !_muted && typeof startMusic === 'function') {
+    startMusic();
+  }
+
+  // 8. Re-draw board
+  drawBoard();
+
+  // Request new game token for the continued run
+  if (typeof fetchGameToken === 'function') {
+    fetchGameToken().catch(() => {});
+  }
+}
+
+function fxReviveClear(topRows) {
+  if (!fxCtx) return;
+
+  const h = topRows * BLOCK; // 8 * 30 = 240px
+  fxCtx.clearRect(0, 0, 300, 600);
+
+  // Electric laser wipe across the top 40%
+  const grad = fxCtx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, 'rgba(255, 0, 127, 0.85)');
+  grad.addColorStop(0.5, 'rgba(0, 229, 255, 0.85)');
+  grad.addColorStop(1, 'rgba(118, 255, 3, 0.2)');
+  fxCtx.fillStyle = grad;
+  fxCtx.fillRect(0, 0, 300, h);
+
+  // Electric particles
+  for (let i = 0; i < 40; i++) {
+    _fxParticles.push({
+      x: Math.random() * 300,
+      y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 10,
+      vy: (Math.random() - 0.5) * 8,
+      size: 3 + Math.random() * 5,
+      color: i % 2 === 0 ? '#ff007f' : '#00e5ff',
+      alpha: 1,
+      life: 1,
+      decay: 0.02 + Math.random() * 0.02,
+    });
+  }
+
+  if (!_fxRaf) _fxRaf = requestAnimationFrame(fxLoop);
+
+  setTimeout(() => {
+    if (fxCtx) fxCtx.clearRect(0, 0, 300, 600);
+  }, 240);
+
+  // Show floating toast on canvas
+  const wrap = canvas.parentElement;
+  if (wrap) {
+    const el = document.createElement('div');
+    el.className = 'revive-toast';
+    el.innerHTML = '<span class="revive-toast-icon">⚡</span> <strong>REVIVED!</strong><small>TOP 40% CLEARED</small>';
+    wrap.appendChild(el);
+    setTimeout(() => el.remove(), 1800);
+  }
+}
+
 // ── Game flow ──────────────────────────────────
 async function startGame() {
   document.body.classList.remove('in-menu');
   try{ if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume(); }catch(_){}
+  resetReviveState();
   board=createBoard(); score=0; level=1; lines=0;
   paused=false; gameRunning=true;
   updateUI();
@@ -778,6 +978,7 @@ function endGame() {
   gameRunning=false; cancelAnimationFrame(animFrame);
   SFX.gameOver(); HAP.gameOver();
   stopHints();
+  startReviveCountdown();
   syncControlButtons();
   // Score is auto-saved with the player's saved name — no name prompt needed
   autoSaveScore();
@@ -803,6 +1004,7 @@ function togglePause() {
 
 function returnToMenu() {
   SFX.click();
+  resetReviveState();
   document.body.classList.add('in-menu');
   gameRunning = false;
   paused = false;
@@ -845,6 +1047,9 @@ function syncPauseBtn() {
 
 function syncControlButtons() {
   syncPauseBtn();
+  if (gameRunning) {
+    updateReviveButtonUI(_hasRevivedThisGame ? 'used' : 'idle');
+  }
 }
 
 // ── Leaderboard ────────────────────────────────
@@ -957,16 +1162,23 @@ function showGameOverOverlay(rank, bestScore) {
     ? `<p style="color:#ffd700;font-size:13px;margin:2px 0">🏅 Personal Best: <strong>${best.toLocaleString()}</strong></p>`
     : (score > 0 ? `<p style="color:#00ff88;font-size:13px;margin:2px 0">🎉 <strong>New Personal Best!</strong></p>` : '');
   const rankMsg=rank?`<p>You ranked <strong>#${rank}</strong> on the leaderboard!</p>`:'';
+
+  const reviveBtnHtml = (!_hasRevivedThisGame && _reviveSecondsLeft > 0)
+    ? `<button class="retro-btn revive-overlay-btn" id="overlayReviveBtn">⚡ REVIVE (<span id="overlayReviveTimer">${_reviveSecondsLeft}</span>s) · CLEAR TOP 40%</button>`
+    : '';
+
   showOverlay(`
     <h2>GAME OVER</h2>
     <p class="final-score">Score: ${score.toLocaleString()}</p>
     ${bestMsg}
     <p>Level ${level} &nbsp;·&nbsp; ${lines} lines</p>
     ${rankMsg}
+    ${reviveBtnHtml}
     <button class="retro-btn" id="restartBtn">▶ Play Again</button>
     <button class="retro-btn secondary" id="goLbBtn">🏆 Leaderboard</button>
     <button class="retro-btn secondary" id="goMenuBtn">🏠 Return to Menu</button>
   `);
+  document.getElementById('overlayReviveBtn')?.addEventListener('click', triggerRevive);
   document.getElementById('restartBtn').addEventListener('click', startGame);
   document.getElementById('goLbBtn').addEventListener('click', openLB);
   document.getElementById('goMenuBtn').addEventListener('click', returnToMenu);
@@ -1481,6 +1693,7 @@ window.endGame = function endGame(){
 (async function init(){
   loadSavedCountry();
   await loadPlayerProfile();
+  document.getElementById('reviveBtn')?.addEventListener('click', triggerRevive);
 })();
 
 // ── Pause button keyboard shortcut ─────────────
