@@ -1238,6 +1238,24 @@ function expireRevive() {
   }
 }
 
+function resumeReviveCountdown() {
+  if (_hasRevivedThisGame || _reviveSecondsLeft <= 0) return;
+  updateReviveButtonUI('active');
+  const timerSpan = document.getElementById('overlayReviveTimer');
+  if (timerSpan) timerSpan.textContent = _reviveSecondsLeft;
+  if (_reviveInterval) clearInterval(_reviveInterval);
+  _reviveInterval = setInterval(() => {
+    _reviveSecondsLeft--;
+    if (_reviveSecondsLeft > 0) {
+      updateReviveButtonUI('active');
+      const ts = document.getElementById('overlayReviveTimer');
+      if (ts) ts.textContent = _reviveSecondsLeft;
+    } else {
+      expireRevive();
+    }
+  }, 1000);
+}
+
 function updateReviveButtonUI(state) {
   const btn = document.getElementById('reviveBtn');
   const lbl = document.getElementById('reviveLabel');
@@ -1274,6 +1292,7 @@ const AdMobManager = {
   isInitialized: false,
   isPrepared: false,
   adPlugin: null,
+  rewardGranted: false,
 
   async init() {
     try {
@@ -1293,14 +1312,32 @@ const AdMobManager = {
     }
   },
 
+  showNotice(title, subtitle) {
+    const wrap = canvas?.parentElement || document.body;
+    const existing = document.querySelector('.ad-notice-toast');
+    if (existing) existing.remove();
+    const el = document.createElement('div');
+    el.className = 'revive-toast ad-notice-toast';
+    el.innerHTML = `<strong>${title}</strong><small>${subtitle}</small>`;
+    wrap.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
+  },
+
   setupListeners() {
     if (!this.adPlugin) return;
     try {
       this.adPlugin.addListener('onRewardedVideoAdReward', () => {
-        console.log('[AdMob] Rewarded completed - executing revive!');
+        console.log('[AdMob] Rewarded completed - granting revive!');
+        this.rewardGranted = true;
         triggerRevive(true);
       });
       this.adPlugin.addListener('onRewardedVideoAdDismissed', () => {
+        if (!this.rewardGranted) {
+          // Player dismissed without completing ad -> DO NOT REVIVE!
+          this.showNotice('⚠️ AD NOT COMPLETED', 'WATCH FULL AD TO REVIVE');
+          resumeReviveCountdown();
+        }
+        this.rewardGranted = false;
         this.preloadRewarded();
       });
       this.adPlugin.addListener('onRewardedVideoAdFailedToLoad', (err) => {
@@ -1326,19 +1363,33 @@ const AdMobManager = {
   async requestReviveWithAd() {
     if (_hasRevivedThisGame || _reviveSecondsLeft <= 0) return;
 
+    // 1. Strict check: Internet connection
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      this.showNotice('⚠️ NO INTERNET', 'CONNECT TO INTERNET TO REVIVE');
+      if (typeof SFX !== 'undefined' && SFX.collision) SFX.collision();
+      return; // STRICT: DO NOT REVIVE
+    }
+
     if (this.adPlugin && this.isInitialized) {
+      this.rewardGranted = false;
+
+      // Pause countdown while ad is displayed
       if (_reviveInterval) {
         clearInterval(_reviveInterval);
         _reviveInterval = null;
       }
+
       try {
         await this.adPlugin.showRewardVideoAd();
-        return;
       } catch (err) {
-        console.warn('[AdMob] Show ad failed, granting revive directly:', err);
-        triggerRevive(true);
+        console.warn('[AdMob] Ad show failed:', err);
+        this.showNotice('⚠️ AD FAILED TO LOAD', 'PLEASE CHECK NETWORK & TRY AGAIN');
+        if (typeof SFX !== 'undefined' && SFX.collision) SFX.collision();
+        resumeReviveCountdown();
+        return; // STRICT: DO NOT REVIVE
       }
     } else {
+      // In browser: if offline, already blocked above. If online, allow direct revive
       triggerRevive();
     }
   }
