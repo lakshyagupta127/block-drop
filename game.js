@@ -732,8 +732,20 @@ function spawnCyberParticle(x, y, color, vy, size, maxLife) {
   });
 }
 
+// ── Smooth Column Change State ──
+let _smoothBeamX = null;
+let _smoothBeamY = null;
+let _lastObservedPieceX = null;
+let _lastObservedPieceId = null;
+const _colAfterglow = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+const _colAfterglowColor = Array(10).fill('#ffe600');
+const _colAfterglowTop = Array(10).fill(20);
+
 function drawCyberEnergyBeams(context) {
   context.save();
+  context.beginPath();
+  context.rect(0, 0, 300, 600);
+  context.clip();
 
   // 1. Settled board columns energy beams
   for (let c = 0; c < COLS; c++) {
@@ -773,30 +785,106 @@ function drawCyberEnergyBeams(context) {
     }
   }
 
-  // 2. Active falling piece energy trail / beam
+  // 2. Active falling piece energy trail & Column Change Smoothing
   if (currentPiece && currentPiece.shape) {
-    const pieceTopByCol = {};
+    if (_smoothBeamX === null || _lastObservedPieceId !== currentPiece) {
+      _smoothBeamX = currentPiece.x;
+      _smoothBeamY = currentPiece.y;
+      _lastObservedPieceX = currentPiece.x;
+      _lastObservedPieceId = currentPiece;
+    } else {
+      // Detect column change (Left / Right / Kick / Swipe)
+      if (_lastObservedPieceX !== currentPiece.x) {
+        const shift = currentPiece.x - _lastObservedPieceX;
+        _lastObservedPieceX = currentPiece.x;
+
+        // Impart lateral momentum impulse to nearby cyber particles
+        const pieceCenterY = currentPiece.y * BLOCK;
+        for (let i = 0; i < cyberParticles.length; i++) {
+          const p = cyberParticles[i];
+          if (Math.abs(p.y - pieceCenterY) < 180) {
+            p.vx += shift * 0.35;
+          }
+        }
+
+        // Spawn lateral transition trail sparkles
+        for (let k = 0; k < 4; k++) {
+          spawnCyberParticle(
+            (_smoothBeamX + Math.random() * currentPiece.shape[0].length) * BLOCK,
+            (currentPiece.y + Math.random() * currentPiece.shape.length) * BLOCK,
+            currentPiece.color,
+            -0.5 - Math.random() * 0.9,
+            1.2 + Math.random() * 1.8,
+            35
+          );
+        }
+      }
+
+      // Smooth continuous glide interpolation (32% lerp per frame = ~110ms silky glide)
+      const dx = currentPiece.x - _smoothBeamX;
+      const dy = currentPiece.y - _smoothBeamY;
+      _smoothBeamX += dx * 0.32;
+      _smoothBeamY += dy * 0.32;
+      if (Math.abs(dx) < 0.003) _smoothBeamX = currentPiece.x;
+      if (Math.abs(dy) < 0.003) _smoothBeamY = currentPiece.y;
+    }
+
+    // Identify occupied columns and local top row per local column
+    const localTopByCol = {};
     for (let r = 0; r < currentPiece.shape.length; r++) {
       for (let c = 0; c < currentPiece.shape[r].length; c++) {
         if (currentPiece.shape[r][c]) {
-          const bCol = currentPiece.x + c;
-          const bRow = currentPiece.y + r;
-          if (bCol >= 0 && bCol < COLS) {
-            if (pieceTopByCol[bCol] === undefined || bRow < pieceTopByCol[bCol]) {
-              pieceTopByCol[bCol] = bRow;
-            }
+          if (localTopByCol[c] === undefined || r < localTopByCol[c]) {
+            localTopByCol[c] = r;
+          }
+          const boardCol = Math.round(currentPiece.x + c);
+          if (boardCol >= 0 && boardCol < COLS) {
+            _colAfterglow[boardCol] = 1.0;
+            _colAfterglowColor[boardCol] = currentPiece.color;
+            _colAfterglowTop[boardCol] = currentPiece.y + r;
           }
         }
       }
     }
 
+    // 2a. Draw fading afterglow ribbon on recently vacated columns
+    for (let c = 0; c < COLS; c++) {
+      let isCurrent = false;
+      for (const locC in localTopByCol) {
+        if (Math.round(_smoothBeamX + parseInt(locC, 10)) === c) {
+          isCurrent = true;
+          break;
+        }
+      }
+      if (!isCurrent) {
+        _colAfterglow[c] = Math.max(0, _colAfterglow[c] - 0.075);
+      }
+      if (_colAfterglow[c] > 0.02) {
+        const glowRgb = hexToRgb(_colAfterglowColor[c]);
+        const gYStart = _colAfterglowTop[c] * BLOCK;
+        const gYEnd = Math.max(0, gYStart - 6 * BLOCK);
+        const gHeight = gYStart - gYEnd;
+        if (gHeight > 0) {
+          const gGrad = context.createLinearGradient(0, gYStart, 0, gYEnd);
+          const a = _colAfterglow[c] * 0.12;
+          gGrad.addColorStop(0, `rgba(${glowRgb.r}, ${glowRgb.g}, ${glowRgb.b}, ${a})`);
+          gGrad.addColorStop(0.4, `rgba(${glowRgb.r}, ${glowRgb.g}, ${glowRgb.b}, ${a * 0.45})`);
+          gGrad.addColorStop(1, `rgba(${glowRgb.r}, ${glowRgb.g}, ${glowRgb.b}, 0)`);
+          context.fillStyle = gGrad;
+          context.fillRect(c * BLOCK + 1, gYEnd, BLOCK - 2, gHeight);
+        }
+      }
+    }
+
+    // 2b. Draw smooth gliding active energy beams
     const rgb = hexToRgb(currentPiece.color);
-    for (const bColStr in pieceTopByCol) {
-      const col = parseInt(bColStr, 10);
-      const topRow = pieceTopByCol[col];
-      const yStart = topRow * BLOCK;
+    for (const locCStr in localTopByCol) {
+      const locC = parseInt(locCStr, 10);
+      const locR = localTopByCol[locC];
+      const beamX = (_smoothBeamX + locC) * BLOCK + 1;
+      const yStart = (_smoothBeamY + locR) * BLOCK;
       // Shaft extends 7 blocks upwards or to canvas top
-      const yEnd = Math.max(0, (topRow - 7) * BLOCK);
+      const yEnd = Math.max(0, yStart - 7 * BLOCK);
       const height = yStart - yEnd;
 
       if (height > 0) {
@@ -807,7 +895,7 @@ function drawCyberEnergyBeams(context) {
         grad.addColorStop(1, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`);
 
         context.fillStyle = grad;
-        context.fillRect(col * BLOCK + 1, yEnd, BLOCK - 2, height);
+        context.fillRect(beamX, yEnd, BLOCK - 2, height);
 
         // Soft diffuse inner core
         const coreGrad = context.createLinearGradient(0, yStart, 0, yEnd);
@@ -815,7 +903,7 @@ function drawCyberEnergyBeams(context) {
         coreGrad.addColorStop(0.4, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08)`);
         coreGrad.addColorStop(1, `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0)`);
         context.fillStyle = coreGrad;
-        context.fillRect(col * BLOCK + 5, yEnd, BLOCK - 10, height);
+        context.fillRect(beamX + 4, yEnd, BLOCK - 10, height);
       }
     }
   }
@@ -824,32 +912,28 @@ function drawCyberEnergyBeams(context) {
 }
 
 function updateAndDrawCyberParticles(context) {
-  // 1. Emit from active piece
-  if (currentPiece && currentPiece.shape && !paused && gameRunning) {
-    const pieceTopByCol = {};
+  // 1. Emit from active piece using smooth position
+  if (currentPiece && currentPiece.shape && !paused && gameRunning && _smoothBeamX !== null) {
+    const localTopByCol = {};
     for (let r = 0; r < currentPiece.shape.length; r++) {
       for (let c = 0; c < currentPiece.shape[r].length; c++) {
         if (currentPiece.shape[r][c]) {
-          const bCol = currentPiece.x + c;
-          const bRow = currentPiece.y + r;
-          if (bCol >= 0 && bCol < COLS) {
-            if (pieceTopByCol[bCol] === undefined || bRow < pieceTopByCol[bCol]) {
-              pieceTopByCol[bCol] = bRow;
-            }
+          if (localTopByCol[c] === undefined || r < localTopByCol[c]) {
+            localTopByCol[c] = r;
           }
         }
       }
     }
-    const cols = Object.keys(pieceTopByCol);
+    const cols = Object.keys(localTopByCol);
     if (cols.length > 0) {
       // Spawn 1-2 particles per frame
       const count = Math.random() < 0.65 ? 2 : 1;
       for (let k = 0; k < count; k++) {
-        const col = parseInt(cols[Math.floor(Math.random() * cols.length)], 10);
-        const topRow = pieceTopByCol[col];
+        const locC = parseInt(cols[Math.floor(Math.random() * cols.length)], 10);
+        const locR = localTopByCol[locC];
         spawnCyberParticle(
-          (col - 0.08 + Math.random() * 1.16) * BLOCK,
-          topRow * BLOCK - Math.random() * 6,
+          (_smoothBeamX + locC - 0.08 + Math.random() * 1.16) * BLOCK,
+          (_smoothBeamY + locR) * BLOCK - Math.random() * 6,
           currentPiece.color,
           -0.7 - Math.random() * 1.1,
           1.1 + Math.random() * 2.3,
@@ -899,6 +983,7 @@ function updateAndDrawCyberParticles(context) {
       p.twinklePhase += p.twinkleSpeed;
       p.x += p.vx + Math.sin(p.swayPhase) * p.swayAmp;
       p.y += p.vy;
+      p.vx *= 0.94; // Air friction on lateral momentum from column changes
     }
 
     const progress = p.life / p.maxLife; // 1 -> 0
@@ -1006,6 +1091,22 @@ function tryRotate() {
   for(const kick of [0,1,-1,2,-2]){
     if(isValid(rotated,currentPiece.x+kick,currentPiece.y)){
       currentPiece.shape=rotated; currentPiece.x+=kick;
+      // Rotation sparkle ring burst
+      if (typeof spawnCyberParticle === 'function') {
+        const cx = (currentPiece.x + rotated[0].length / 2) * BLOCK;
+        const cy = (currentPiece.y + rotated.length / 2) * BLOCK;
+        for (let k = 0; k < 6; k++) {
+          const ang = (k / 6) * Math.PI * 2;
+          spawnCyberParticle(
+            cx + Math.cos(ang) * 14,
+            cy + Math.sin(ang) * 14,
+            currentPiece.color,
+            Math.sin(ang) * 0.9 - 0.5,
+            1.2 + Math.random() * 1.6,
+            30
+          );
+        }
+      }
       SFX.rotate(); HAP.rotate(); return;
     }
   }
@@ -1014,6 +1115,9 @@ function tryRotate() {
 function spawnPiece() {
   currentPiece=nextPiece||randomPiece();
   nextPiece=randomPiece();
+  _smoothBeamX = null;
+  _smoothBeamY = null;
+  _lastObservedPieceId = null;
   drawNext();
   if(!isValid(currentPiece.shape,currentPiece.x,currentPiece.y)) endGame();
 }
