@@ -1556,6 +1556,8 @@ const AdMobManager = {
   testInterstitialAdId: 'ca-app-pub-3940256099942544/1033173712',
   isInterstitialPrepared: false,
   _onInterstitialClosed: null,
+  _isShowingPendingAd: false,
+  _networkInterval: null,
 
   isInitialized: false,
   isPrepared: false,
@@ -1567,6 +1569,50 @@ const AdMobManager = {
 
   hasPendingInterstitial() {
     return localStorage.getItem(PENDING_INTERSTITIAL_KEY) === 'true';
+  },
+
+  checkPendingAdOnline() {
+    const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
+    if (!isOnline) return;
+
+    // Ensure ad units are preloaded in background once online
+    if (this.adPlugin && this.isInitialized) {
+      if (!this.isInterstitialPrepared) this.preloadInterstitial();
+      if (!this.isPrepared) this.preloadRewarded();
+      if (!this.isBannerShowing && (typeof gameRunning === 'undefined' || !gameRunning || paused)) {
+        this.showMenuBanner();
+      }
+    }
+
+    if (!this.hasPendingInterstitial()) return;
+    if (this._isShowingPendingAd) return;
+
+    // If game has started / is active and internet turned on: automatically show the ad!
+    if (typeof gameRunning !== 'undefined' && gameRunning) {
+      this._isShowingPendingAd = true;
+      console.log('[AdMob] Game is active and internet turned ON with pending interstitial. Showing ad automatically...');
+
+      const wasPlaying = (typeof paused !== 'undefined' && !paused);
+      if (wasPlaying) {
+        paused = true;
+        if (typeof stopMusic === 'function') stopMusic();
+        if (typeof syncPauseBtn === 'function') syncPauseBtn();
+      }
+
+      this.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
+
+      this.showInterstitialAd(() => {
+        this._isShowingPendingAd = false;
+        if (wasPlaying && typeof gameRunning !== 'undefined' && gameRunning) {
+          paused = false;
+          if (typeof lastDrop !== 'undefined') lastDrop = performance.now();
+          if (typeof startMusic === 'function' && typeof _musicOn !== 'undefined' && _musicOn && !_muted) {
+            startMusic();
+          }
+          if (typeof syncPauseBtn === 'function') syncPauseBtn();
+        }
+      });
+    }
   },
 
   async init() {
@@ -1674,6 +1720,7 @@ const AdMobManager = {
         // User watched/dismissed the ad — clear the pending requirement
         localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
         this.isInterstitialPrepared = false;
+        this._isShowingPendingAd = false;
         this.preloadInterstitial();
         if (typeof this._onInterstitialClosed === 'function') {
           const cb = this._onInterstitialClosed;
@@ -1687,7 +1734,9 @@ const AdMobManager = {
       });
       this.adPlugin.addListener('onInterstitialAdFailedToShow', (err) => {
         console.warn('[AdMob] Interstitial failed to show event:', err);
-        localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+        // Do NOT clear PENDING_INTERSTITIAL_KEY — keep requirement for when network is ready
+        this.isInterstitialPrepared = false;
+        this._isShowingPendingAd = false;
         if (typeof this._onInterstitialClosed === 'function') {
           const cb = this._onInterstitialClosed;
           this._onInterstitialClosed = null;
@@ -1703,6 +1752,19 @@ const AdMobManager = {
       this.adPlugin.addListener('onBannerAdFailedToLoad', (err) => {
         console.warn('[AdMob] Banner failed to load:', err);
       });
+
+      // Auto-trigger pending interstitial when internet is restored
+      window.addEventListener('online', () => {
+        console.log('[AdMob] Network restored (online event)');
+        this.checkPendingAdOnline();
+      });
+
+      // Periodic check every 1.5 seconds to reliably detect reconnection on mobile
+      if (!this._networkInterval) {
+        this._networkInterval = setInterval(() => {
+          this.checkPendingAdOnline();
+        }, 1500);
+      }
     } catch (_) {}
   },
 
@@ -1793,13 +1855,19 @@ const AdMobManager = {
 
   async showInterstitialAd(onClosed) {
     if (!this.adPlugin || !this.isInitialized) {
+      console.log('[AdMob] In web browser testing: simulated interstitial completed');
       localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+      this._isShowingPendingAd = false;
       if (onClosed) onClosed();
       return;
     }
 
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      this.showNotice('⚠️ NO INTERNET', 'CONNECT TO INTERNET TO CONTINUE');
+    const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
+    if (!isOnline) {
+      // Offline: do NOT show alert '⚠️ NO INTERNET: CONNECT TO INTERNET TO PLAY'
+      // Keep pending flag stored so it automatically shows when internet connects
+      this._isShowingPendingAd = false;
+      if (onClosed) onClosed();
       return;
     }
 
@@ -1809,11 +1877,16 @@ const AdMobManager = {
     if (!this.isInterstitialPrepared) {
       console.log('[AdMob] Interstitial not ready yet, loading on-demand...');
       await this.preloadInterstitial();
+      for (let attempt = 0; attempt < 4 && !this.isInterstitialPrepared; attempt++) {
+        await new Promise(r => setTimeout(r, 500));
+        await this.preloadInterstitial();
+      }
     }
 
     if (!this.isInterstitialPrepared) {
-      console.warn('[AdMob] Interstitial could not be loaded, bypassing');
-      localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+      console.warn('[AdMob] Interstitial still loading or slow network; keeping pending flag for next retry');
+      this._isShowingPendingAd = false;
+      // Do NOT remove PENDING_INTERSTITIAL_KEY! Keep it active
       if (onClosed) onClosed();
       return;
     }
@@ -1822,8 +1895,9 @@ const AdMobManager = {
       await this.adPlugin.showInterstitial();
     } catch (err) {
       console.warn('[AdMob] Interstitial show failed:', err);
-      localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
       this.isInterstitialPrepared = false;
+      this._isShowingPendingAd = false;
+      // Do NOT clear PENDING_INTERSTITIAL_KEY on transient error
       if (onClosed) onClosed();
     }
   },
@@ -2068,36 +2142,58 @@ function shouldTriggerGameOverInterstitial() {
 }
 
 function handlePlayAgainClick() {
+  const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
+
   if (AdMobManager.hasPendingInterstitial()) {
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      AdMobManager.showNotice('⚠️ NO INTERNET', 'CONNECT TO INTERNET TO PLAY');
+    if (isOnline) {
+      AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
+      AdMobManager.showInterstitialAd(() => {
+        startGame();
+      });
+      return;
+    } else {
+      // Offline: do not show alert '⚠️ NO INTERNET: CONNECT TO INTERNET TO PLAY'
+      // Allow playing locally; pending flag remains stored and will trigger when online
+      console.log('[AdMob] Offline: bypassing pending block for local play, ad will trigger when online');
+      startGame();
       return;
     }
-    AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
-    AdMobManager.showInterstitialAd(() => {
-      startGame();
-    });
-    return;
   }
 
   // Interstitial triggers every 4th/5th game — not skipped even if player used a revive
   if (shouldTriggerGameOverInterstitial()) {
     localStorage.setItem(INTERSTITIAL_COUNT_KEY, '0');
-    AdMobManager.showInterstitialAd(() => {
+    if (isOnline) {
+      AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
+      AdMobManager.showInterstitialAd(() => {
+        startGame();
+      });
+    } else {
+      // Offline: store pending flag for when internet connects, and start local game immediately
+      localStorage.setItem(PENDING_INTERSTITIAL_KEY, 'true');
       startGame();
-    });
+    }
   } else {
     startGame();
   }
 }
 
 function handleGoMenuClick() {
+  const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
+
   // Interstitial triggers every 4th/5th game — not skipped even if player used a revive
   if (shouldTriggerGameOverInterstitial()) {
     localStorage.setItem(INTERSTITIAL_COUNT_KEY, '0');
-    AdMobManager.showInterstitialAd(() => {
+    if (isOnline) {
+      AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
+      AdMobManager.showInterstitialAd(() => {
+        returnToMenu();
+      });
+    } else {
+      // Offline: store pending flag for when internet connects
+      localStorage.setItem(PENDING_INTERSTITIAL_KEY, 'true');
       returnToMenu();
-    });
+    }
   } else {
     returnToMenu();
   }
@@ -2105,17 +2201,21 @@ function handleGoMenuClick() {
 
 // ── Game flow ──────────────────────────────────
 async function startGame() {
+  const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
+
   // Check if player has a pending interstitial from previously closing the app
   if (AdMobManager.hasPendingInterstitial()) {
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      AdMobManager.showNotice('⚠️ NO INTERNET', 'CONNECT TO INTERNET TO PLAY');
+    if (isOnline) {
+      AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
+      AdMobManager.showInterstitialAd(() => {
+        startGame();
+      });
       return;
+    } else {
+      // Offline: do not show alerts '⚠️ NO INTERNET: CONNECT TO INTERNET TO PLAY'
+      // Allow local gameplay, keep pending flag active so ad shows when internet is on
+      console.log('[AdMob] Offline: starting local game with pending interstitial flag active');
     }
-    AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
-    AdMobManager.showInterstitialAd(() => {
-      startGame();
-    });
-    return;
   }
 
   // Hide banner during active gameplay
