@@ -2080,7 +2080,8 @@ function handlePlayAgainClick() {
     return;
   }
 
-  if (shouldTriggerGameOverInterstitial() && !_hasRevivedThisGame) {
+  // Interstitial triggers every 4th/5th game — not skipped even if player used a revive
+  if (shouldTriggerGameOverInterstitial()) {
     localStorage.setItem(INTERSTITIAL_COUNT_KEY, '0');
     AdMobManager.showInterstitialAd(() => {
       startGame();
@@ -2091,7 +2092,8 @@ function handlePlayAgainClick() {
 }
 
 function handleGoMenuClick() {
-  if (shouldTriggerGameOverInterstitial() && !_hasRevivedThisGame) {
+  // Interstitial triggers every 4th/5th game — not skipped even if player used a revive
+  if (shouldTriggerGameOverInterstitial()) {
     localStorage.setItem(INTERSTITIAL_COUNT_KEY, '0');
     AdMobManager.showInterstitialAd(() => {
       returnToMenu();
