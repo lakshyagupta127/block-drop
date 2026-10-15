@@ -139,6 +139,37 @@ async function getFingerprint() {
   return cached;
 }
 
+// ── Server & Offline-Resilient API Helper ──────
+const SERVER_URL = 'https://block-drop.onrender.com';
+
+function getApiUrl(path) {
+  const isCapacitorNative = typeof window.Capacitor !== 'undefined' && 
+    (window.Capacitor.isNativePlatform?.() || 
+     window.location.protocol === 'capacitor:' || 
+     window.location.protocol === 'ionic:' || 
+     window.location.hostname === 'localhost' || 
+     window.location.hostname === '127.0.0.1');
+
+  const base = isCapacitorNative ? SERVER_URL : '';
+  const cleanPath = path.startsWith('/') ? path : '/' + path;
+  return `${base}${cleanPath}`;
+}
+
+async function apiFetch(endpoint, options = {}, timeoutMs = 5000) {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    throw new Error('Device is offline');
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const url = getApiUrl(endpoint);
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── Player profile state ───────────────────────
 const PLAYER_NAME_KEY = 'bd_player_name';
 let _playerFp          = null;
@@ -146,7 +177,7 @@ let _playerIdFormatted = null;
 let _playerName        = localStorage.getItem(PLAYER_NAME_KEY) || 'Player';
 let _canChangeName     = true;
 let _nextChangeAt      = null;
-let _personalBest      = 0;
+let _personalBest      = parseInt(localStorage.getItem('bd_best_score') || '0', 10);
 let _totalGames        = 0;
 let _totalLines        = 0;
 let _bestLevel         = 1;
@@ -157,11 +188,25 @@ let _lastPlayedAt      = null;
 let _isReturning       = false;
 
 async function loadPlayerProfile() {
+  // 1. Immediately apply local cached data so UI is instantly ready offline
+  try {
+    _playerName = localStorage.getItem(PLAYER_NAME_KEY) || _playerName || 'Player';
+    const savedBest = parseInt(localStorage.getItem('bd_best_score') || '0', 10);
+    if (savedBest > _personalBest) _personalBest = savedBest;
+    updatePlayerUI();
+  } catch (_) {}
+
+  // 2. If offline, don't attempt network fetch
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return;
+  }
+
+  // 3. Sync with backend in background
   try {
     _playerFp = await getFingerprint();
     const [profileRes, statsRes] = await Promise.all([
-      fetch(`/api/player?fp=${encodeURIComponent(_playerFp)}`),
-      fetch(`/api/player/stats?fp=${encodeURIComponent(_playerFp)}`),
+      apiFetch(`/api/player?fp=${encodeURIComponent(_playerFp)}`),
+      apiFetch(`/api/player/stats?fp=${encodeURIComponent(_playerFp)}`),
     ]);
     const profileData = await profileRes.json();
     const statsData   = await statsRes.json();
@@ -179,7 +224,8 @@ async function loadPlayerProfile() {
       }
     }
     if (statsData.success) {
-      _personalBest = statsData.bestScore    || 0;
+      _personalBest = Math.max(_personalBest, statsData.bestScore || 0);
+      localStorage.setItem('bd_best_score', _personalBest);
       _totalGames   = statsData.totalGames   || 0;
       _totalLines   = statsData.totalLines   || 0;
       _bestLevel    = statsData.bestLevel    || 1;
@@ -191,7 +237,7 @@ async function loadPlayerProfile() {
     }
     updatePlayerUI();
   } catch(err) {
-    console.warn('Could not load player profile:', err);
+    console.warn('Profile sync skipped (offline or server sleeping):', err?.message || err);
   }
 }
 
@@ -423,11 +469,11 @@ async function commitSettingsName(newName) {
   const btn   = document.getElementById('saveNameBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Saving…'; }
   try {
-    const res  = await fetch('/api/player/name', {
+    const res  = await apiFetch('/api/player/name', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fp: _playerFp, name: newName })
-    });
+    }, 8000);
     const data = await res.json();
     if (data.success) {
       _playerName = data.name;
@@ -466,37 +512,47 @@ async function commitSettingsName(newName) {
 }
 
 // ── Secure API helpers ─────────────────────────
-const API = '/api';
 let _gameToken   = null;
 let _gameStartTs = null;
 
 async function fetchGameToken() {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    _gameToken = null;
+    return;
+  }
   try {
-    const res=await fetch(`${API}/game-token`);
-    const data=await res.json();
-    if (data.success) { _gameToken=data.token; _gameStartTs=Date.now(); }
+    const res = await apiFetch('/api/game-token', {}, 4000);
+    const data = await res.json();
+    if (data.success) { _gameToken = data.token; _gameStartTs = Date.now(); }
   } catch(err) {
-    console.warn('Could not fetch game token:', err);
-    _gameToken=null;
+    _gameToken = null;
   }
 }
 
 async function apiFetchScores(limit=10) {
   try {
-    const res=await fetch(`${API}/scores?limit=${limit}`);
-    const data=await res.json();
+    const res = await apiFetch(`/api/scores?limit=${limit}`, {}, 5000);
+    const data = await res.json();
     return data.success ? data.scores : [];
   } catch { return []; }
 }
 
 async function apiSaveScore(name, score, level, lines) {
+  // Always update personal best locally first so offline play never loses score
+  _personalBest = Math.max(_personalBest, score);
+  try { localStorage.setItem('bd_best_score', _personalBest); } catch(_) {}
+
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return { success: true, bestScore: _personalBest };
+  }
   if (!_gameToken) await fetchGameToken();
-  if (!_gameToken) return { success:false, error:'No game token' };
+  if (!_gameToken) return { success: false, bestScore: _personalBest, error: 'Offline score recorded' };
   try {
     const duration = _gameStartTs ? Math.floor((Date.now()-_gameStartTs)/1000) : 0;
-    const res = await fetch(`${API}/scores`,{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
+    const res = await apiFetch('/api/scores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         fp:           _playerFp,
         name, score, level, lines, duration,
         device:       detectDevice(),
@@ -504,16 +560,19 @@ async function apiSaveScore(name, score, level, lines) {
         country_code: _playerCountry.code || '',
         country_flag: _playerCountry.flag || '',
       }),
-    });
-    const data=await res.json();
-    _gameToken=null;
+    }, 6000);
+    const data = await res.json();
+    _gameToken = null;
     return data;
-  } catch(err) { _gameToken=null; return {success:false,error:err.message}; }
+  } catch(err) {
+    _gameToken = null;
+    return { success: false, bestScore: _personalBest, error: err.message };
+  }
 }
 
 async function apiClearScores() {
   try {
-    const res=await fetch(`${API}/scores`,{method:'DELETE'});
+    const res = await apiFetch('/api/scores', { method: 'DELETE' }, 5000);
     return (await res.json()).success;
   } catch { return false; }
 }
@@ -1375,8 +1434,11 @@ function updateReviveButtonUI(state) {
 const AdMobManager = {
   appId: 'ca-app-pub-8122097857797560~6769216530',
   rewardedAdId: 'ca-app-pub-8122097857797560/7568127036',
+  // Official Google Rewarded Video Test Ad Unit ID for Android
+  testRewardedAdId: 'ca-app-pub-3940256099942544/5224354917',
   isInitialized: false,
   isPrepared: false,
+  activeAdUnitId: null,
   adPlugin: null,
   rewardGranted: false,
   pendingAction: null,
@@ -1384,8 +1446,17 @@ const AdMobManager = {
 
   async init() {
     try {
-      if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins && window.Capacitor.Plugins.AdMob) {
-        this.adPlugin = window.Capacitor.Plugins.AdMob;
+      // Allow Capacitor bridge up to 1.5 seconds to populate plugins on native launch
+      for (let i = 0; i < 6; i++) {
+        if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins && window.Capacitor.Plugins.AdMob) {
+          this.adPlugin = window.Capacitor.Plugins.AdMob;
+          break;
+        }
+        await new Promise(r => setTimeout(r, 250));
+      }
+
+      if (this.adPlugin) {
+        console.log('[AdMob] Found native AdMob plugin, initializing...');
         await this.adPlugin.initialize({
           requestTrackingAuthorization: true,
           initializeForTesting: false
@@ -1393,10 +1464,12 @@ const AdMobManager = {
         this.isInitialized = true;
         this.setupListeners();
         this.preloadRewarded();
-        console.log('[AdMob] Initialized successfully');
+        console.log('[AdMob] AdMob initialized successfully');
+      } else {
+        console.log('[AdMob] Running in web browser mode (direct fallback for browser testing)');
       }
     } catch (e) {
-      console.warn('[AdMob] Init:', e);
+      console.warn('[AdMob] Init error:', e);
     }
   },
 
@@ -1424,6 +1497,7 @@ const AdMobManager = {
         }
       });
       this.adPlugin.addListener('onRewardedVideoAdDismissed', () => {
+        console.log('[AdMob] Ad dismissed. Reward granted:', this.rewardGranted);
         if (!this.rewardGranted) {
           // Player dismissed without completing ad
           if (this.pendingAction === 'nameChangeUnlock') {
@@ -1438,11 +1512,12 @@ const AdMobManager = {
         }
         this.rewardGranted = false;
         this.pendingAction = null;
-        this.pendingName = null;
+        this.isPrepared = false;
+        // Preload next ad in background
         this.preloadRewarded();
       });
       this.adPlugin.addListener('onRewardedVideoAdFailedToLoad', (err) => {
-        console.warn('[AdMob] Ad load failed:', err);
+        console.warn('[AdMob] Ad load failed event:', err);
         this.isPrepared = false;
         if (this.pendingAction === 'nameChangeUnlock') {
           this.showNotice('⚠️ AD FAILED TO LOAD', 'PLEASE CHECK NETWORK & TRY AGAIN');
@@ -1455,16 +1530,53 @@ const AdMobManager = {
   },
 
   async preloadRewarded() {
-    if (!this.adPlugin) return;
+    if (!this.adPlugin || !this.isInitialized) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+
+    // 1. Try production ad unit ID first
     try {
+      console.log('[AdMob] Preloading production ad unit:', this.rewardedAdId);
       await this.adPlugin.prepareRewardVideoAd({
         adId: this.rewardedAdId,
         isTesting: false
       });
       this.isPrepared = true;
-    } catch (e) {
+      this.activeAdUnitId = this.rewardedAdId;
+      console.log('[AdMob] Production rewarded ad loaded & ready');
+      return;
+    } catch (err) {
+      console.warn('[AdMob] Production ad prepare failed, trying test ad unit fallback:', err?.message || err);
+    }
+
+    // 2. If production ad has No Fill (Error 3) or is unverified, fall back to official test ad unit
+    try {
+      console.log('[AdMob] Preloading test ad unit:', this.testRewardedAdId);
+      await this.adPlugin.prepareRewardVideoAd({
+        adId: this.testRewardedAdId,
+        isTesting: true
+      });
+      this.isPrepared = true;
+      this.activeAdUnitId = this.testRewardedAdId;
+      console.log('[AdMob] Test rewarded ad loaded & ready');
+    } catch (err2) {
+      console.warn('[AdMob] Test ad prepare also failed:', err2?.message || err2);
       this.isPrepared = false;
     }
+  },
+
+  async showPreparedOrLoad() {
+    if (!this.adPlugin) throw new Error('No AdMob plugin');
+
+    if (!this.isPrepared) {
+      console.log('[AdMob] Ad not ready yet, loading on-demand...');
+      await this.preloadRewarded();
+    }
+
+    if (!this.isPrepared) {
+      throw new Error('Ad could not be loaded');
+    }
+
+    await this.adPlugin.showRewardVideoAd();
   },
 
   async requestReviveWithAd() {
@@ -1489,7 +1601,7 @@ const AdMobManager = {
       }
 
       try {
-        await this.adPlugin.showRewardVideoAd();
+        await this.showPreparedOrLoad();
       } catch (err) {
         console.warn('[AdMob] Ad show failed:', err);
         this.showNotice('⚠️ AD FAILED TO LOAD', 'PLEASE CHECK NETWORK & TRY AGAIN');
@@ -1499,7 +1611,7 @@ const AdMobManager = {
         return; // STRICT: DO NOT REVIVE
       }
     } else {
-      // In browser: if offline, already blocked above. If online, allow direct revive
+      // In web browser: if offline, already blocked above. If online, allow direct revive
       triggerRevive();
     }
   },
@@ -1526,7 +1638,7 @@ const AdMobManager = {
       this.pendingName = null;
 
       try {
-        await this.adPlugin.showRewardVideoAd();
+        await this.showPreparedOrLoad();
       } catch (err) {
         console.warn('[AdMob] Name change ad show failed:', err);
         this.showNotice('⚠️ AD FAILED TO LOAD', 'PLEASE CHECK NETWORK & TRY AGAIN');
@@ -1878,10 +1990,12 @@ function showGameOverOverlay(rank, bestScore) {
   document.getElementById('goMenuBtn').addEventListener('click', returnToMenu);
   // Refresh stats
   if(_playerFp){
-    fetch(`/api/player/stats?fp=${encodeURIComponent(_playerFp)}`)
+    apiFetch(`/api/player/stats?fp=${encodeURIComponent(_playerFp)}`)
       .then(r=>r.json()).then(data=>{
         if(data.success){
-          _personalBest=data.bestScore||0; _totalGames=data.totalGames||0;
+          _personalBest=Math.max(_personalBest, data.bestScore||0);
+          try{ localStorage.setItem('bd_best_score', _personalBest); }catch(_){}
+          _totalGames=data.totalGames||0;
           _totalLines=data.totalLines||0;  _bestLevel=data.bestLevel||1;
           _lastScore=data.lastScore||0;    _lastLevel=data.lastLevel||1;
           _lastLines=data.lastLines||0;    _lastPlayedAt=data.lastPlayedAt||null;
@@ -2274,12 +2388,12 @@ async function deleteAllMyData(){
   if(btn){ btn.disabled=true; btn.textContent='⏳ Deleting…'; }
   try{
     if(_playerFp){
-      const res=await fetch(`/api/player/${encodeURIComponent(_playerFp)}`,{method:'DELETE'});
+      const res=await apiFetch(`/api/player/${encodeURIComponent(_playerFp)}`,{method:'DELETE'}, 6000);
       const data=await res.json();
       if(!data.success) throw new Error(data.error);
     }
     [PLAYER_FP_KEY,AGE_CONSENT_KEY,GDPR_BANNER_KEY,VOLUME_KEY,MUSIC_KEY,MUTE_KEY,MUSIC_ON_KEY,
-     'bd_language','bd_demo_seen','bd_hints_seen','bd_htp_seen','bd_onboarding_done']
+     'bd_language','bd_demo_seen','bd_hints_seen','bd_htp_seen','bd_onboarding_done', 'bd_best_score']
      .forEach(k=>localStorage.removeItem(k));
     _playerFp=null; _playerName='Player'; _canChangeName=true; _nextChangeAt=null;
     updatePlayerUI();
@@ -2296,7 +2410,7 @@ async function deleteAllMyData(){
 async function exportMyData(){
   if(!_playerFp){ alert('No player data found to export.'); return; }
   try{
-    const res=await fetch(`/api/player/${encodeURIComponent(_playerFp)}/export`);
+    const res=await apiFetch(`/api/player/${encodeURIComponent(_playerFp)}/export`, {}, 8000);
     if(!res.ok) throw new Error('Export failed');
     const blob=await res.blob();
     const url=URL.createObjectURL(blob);
@@ -2370,9 +2484,9 @@ window.endGame = function endGame(){
 };
 
 // ── Init on page load ─────────────────────────
-(async function init(){
+(function init(){
   loadSavedCountry();
-  await loadPlayerProfile();
+  loadPlayerProfile(); // non-blocking background sync with offline cache
   document.getElementById('reviveBtn')?.addEventListener('click', () => AdMobManager.requestReviveWithAd());
   AdMobManager.init();
 })();
@@ -2775,7 +2889,7 @@ async function submitOnboardName(){
 
   if(_playerFp){
     try{
-      const res  = await fetch('/api/player/name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fp:_playerFp,name})});
+      const res  = await apiFetch('/api/player/name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fp:_playerFp,name})}, 6000);
       const data = await res.json();
       if(data.success){
         _playerName=data.name; _canChangeName=data.canChangeName; _nextChangeAt=data.nextChangeAt;
