@@ -2973,7 +2973,7 @@ const OD_STEPS=[
   {key:'← →',   text:'Move left & right', action:'move',     gestureFn:'gestureSwipeH', btnId:'demoBtnLeft'},
   {key:'↑ / ↻', text:'Rotate the block',  action:'rotate',   gestureFn:'gestureTap',    btnId:'demoBtnRotate'},
   {key:'▼ Soft', text:'Soft drop',        action:'softdrop', gestureFn:'gestureDown',   btnId:'demoBtnSoft'},
-  {key:'⬇ Drop', text:'Hard drop!',       action:'harddrop', gestureFn:'gestureSwipeD', btnId:'demoBtnDrop'},
+  {key:'⬇ Drop', text:'DROP!',            action:'harddrop', gestureFn:'gestureSwipeD', btnId:'demoBtnDrop'},
   {key:'Row = 💥','text':'Fill row → Clear!', action:'clear', gestureFn:'gestureTap',   btnId:null},
 ];
 
@@ -3654,7 +3654,7 @@ const HINT_STEPS=[
   {id:'move',   icon:'↔️', title:'Move',      desc:'← → to move the block'},
   {id:'rotate', icon:'🔄', title:'Rotate',    desc:'↑ or ↻ button to rotate'},
   {id:'soft',   icon:'⬇️', title:'Soft Drop', desc:'↓ to drop slowly'},
-  {id:'hard',   icon:'💥', title:'Hard Drop', desc:'Space / Drop button — instant'},
+  {id:'hard',   icon:'💥', title:'DROP',      desc:'Space / Drop button — instant'},
   {id:'clear',  icon:'✨', title:'Clear!',    desc:'Fill a row to score points'},
 ];
 let _hintStep=0, _hintsActive=false, _hintDone={}, _hintTimeout=null;

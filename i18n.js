@@ -46,7 +46,7 @@ const T = {
     move:                 'Move',
     rotate:               'Rotate',
     soft_drop:            'Soft drop',
-    hard_drop:            'Hard drop',
+    hard_drop:            'DROP',
     pause_key:            'Pause',
     // Overlay
     tap_to_start:         'Tap or press Space to start',
