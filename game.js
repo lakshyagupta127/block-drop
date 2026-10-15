@@ -302,38 +302,80 @@ function updatePlayerUI() {
   }
 }
 
-// ── Settings Modal ─────────────────────────────
+// ── Settings Modal & Name Change ───────────────
+let _isNameChangeUnlocked = false;
+
+function unlockNameChangeField() {
+  _isNameChangeUnlocked = true;
+  const adWrap  = document.getElementById('nameAdWrap');
+  const inpWrap = document.getElementById('nameInputWrap');
+  const msgEl   = document.getElementById('settingsMsg');
+  const inp     = document.getElementById('settingsNameInput');
+
+  if (adWrap) adWrap.style.display = 'none';
+  if (inpWrap) inpWrap.style.display = 'flex';
+  if (msgEl) {
+    msgEl.textContent = '✨ Name change unlocked! Enter your new name below.';
+    msgEl.className = 'settings-msg success';
+  }
+  resetWatchNameAdBtn();
+  if (inp) {
+    inp.value = '';
+    setTimeout(() => inp.focus(), 150);
+  }
+  AdMobManager.showNotice('✨ UNLOCKED', 'ENTER YOUR NEW DISPLAY NAME');
+  if (typeof SFX !== 'undefined' && SFX.click) SFX.click();
+}
+
+function lockNameChangeField() {
+  _isNameChangeUnlocked = false;
+  const adWrap  = document.getElementById('nameAdWrap');
+  const inpWrap = document.getElementById('nameInputWrap');
+  const msgEl   = document.getElementById('settingsMsg');
+  const inp     = document.getElementById('settingsNameInput');
+
+  if (adWrap) adWrap.style.display = 'flex';
+  if (inpWrap) inpWrap.style.display = 'none';
+  if (inp) inp.value = '';
+  if (msgEl) { msgEl.textContent = ''; msgEl.className = 'settings-msg'; }
+  resetWatchNameAdBtn();
+}
+
+function resetWatchNameAdBtn() {
+  const btn = document.getElementById('watchNameAdBtn');
+  if (btn) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="ad-badge">AD</span> 📺 <span>Watch Ad to Change Name</span>';
+  }
+}
+
 function openSettings() {
   try { SFX.click(); } catch(_) {}
   const modal = document.getElementById('settingsModal');
   if (!modal) return;
   const curEl = document.getElementById('settingsCurrentName');
   const idEl  = document.getElementById('settingsPlayerId');
-  const form  = document.getElementById('nameChangeForm');
   const lock  = document.getElementById('nameCooldownNotice');
   const msgEl = document.getElementById('settingsMsg');
   if (curEl) curEl.textContent = _playerName || 'Player';
   if (idEl)  idEl.textContent  = _playerIdFormatted || (_playerFp ? 'BD-' + _playerFp.slice(0, 6).toUpperCase() : 'BD-00001');
   if (msgEl) { msgEl.textContent=''; msgEl.className='settings-msg'; }
-  const inp = document.getElementById('settingsNameInput');
-  if (inp) inp.value = '';
-  if (form) form.style.display='flex';
   if (lock) lock.style.display='none';
-  resetSaveNameBtn();
+
+  if (!_isNameChangeUnlocked) {
+    lockNameChangeField();
+  } else {
+    const adWrap  = document.getElementById('nameAdWrap');
+    const inpWrap = document.getElementById('nameInputWrap');
+    if (adWrap) adWrap.style.display = 'none';
+    if (inpWrap) inpWrap.style.display = 'flex';
+  }
+
   modal.style.display='flex';
   modal.style.zIndex='100000';
-  if (inp) setTimeout(()=>inp.focus(),100);
-}
-
-function renderCooldown() {
-  // Cooldown replaced by rewarded ad unlock
-}
-
-function resetSaveNameBtn() {
-  const btn = document.getElementById('saveNameBtn');
-  if (btn) {
-    btn.disabled = false;
-    btn.innerHTML = '<span class="ad-badge">AD</span> 📺 <span>Watch Ad to Change Name</span>';
+  if (_isNameChangeUnlocked) {
+    const inp = document.getElementById('settingsNameInput');
+    if (inp) setTimeout(()=>inp.focus(),100);
   }
 }
 
@@ -341,6 +383,7 @@ function closeSettings() {
   try { SFX.click(); } catch(_) {}
   const modal = document.getElementById('settingsModal');
   if (modal) modal.style.display='none';
+  lockNameChangeField();
 }
 
 async function saveSettingsName() {
@@ -372,13 +415,13 @@ async function saveSettingsName() {
   }
   if (msgEl) { msgEl.textContent=''; msgEl.className='settings-msg'; }
 
-  AdMobManager.requestNameChangeWithAd(newName);
+  await commitSettingsName(newName);
 }
 
 async function commitSettingsName(newName) {
   const msgEl = document.getElementById('settingsMsg');
   const btn   = document.getElementById('saveNameBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Updating…'; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Saving…'; }
   try {
     const res  = await fetch('/api/player/name', {
       method: 'POST',
@@ -397,6 +440,14 @@ async function commitSettingsName(newName) {
       if (curEl) curEl.textContent = _playerName;
       const idEl = document.getElementById('settingsPlayerId');
       if (idEl) idEl.textContent = _playerIdFormatted || ('BD-' + _playerFp.slice(0, 6).toUpperCase());
+      
+      // Reset unlocked state and return to ad trigger wrap
+      _isNameChangeUnlocked = false;
+      const adWrap  = document.getElementById('nameAdWrap');
+      const inpWrap = document.getElementById('nameInputWrap');
+      if (adWrap) adWrap.style.display = 'flex';
+      if (inpWrap) inpWrap.style.display = 'none';
+
       if (msgEl) { msgEl.textContent = '✔ Name & leaderboard scores updated!'; msgEl.className = 'settings-msg success'; }
       AdMobManager.showNotice('✔ NAME UPDATED', `Scores adapted for ${_playerName}`);
       const inp = document.getElementById('settingsNameInput');
@@ -407,7 +458,10 @@ async function commitSettingsName(newName) {
   } catch (err) {
     if (msgEl) { msgEl.textContent = 'Network or server error. Try again.'; msgEl.className = 'settings-msg error'; }
   } finally {
-    resetSaveNameBtn();
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '✔ <span>Save New Name</span>';
+    }
   }
 }
 
@@ -1365,16 +1419,18 @@ const AdMobManager = {
         this.rewardGranted = true;
         if (this.pendingAction === 'revive') {
           triggerRevive(true);
-        } else if (this.pendingAction === 'nameChange' && this.pendingName) {
-          commitSettingsName(this.pendingName);
+        } else if (this.pendingAction === 'nameChangeUnlock') {
+          unlockNameChangeField();
         }
       });
       this.adPlugin.addListener('onRewardedVideoAdDismissed', () => {
         if (!this.rewardGranted) {
           // Player dismissed without completing ad
-          if (this.pendingAction === 'nameChange') {
+          if (this.pendingAction === 'nameChangeUnlock') {
             this.showNotice('⚠️ AD NOT COMPLETED', 'WATCH FULL AD TO CHANGE NAME');
-            resetSaveNameBtn();
+            const msgEl = document.getElementById('settingsMsg');
+            if (msgEl) { msgEl.textContent = '⚠️ Watch full ad to unlock name change.'; msgEl.className = 'settings-msg error'; }
+            resetWatchNameAdBtn();
           } else {
             this.showNotice('⚠️ AD NOT COMPLETED', 'WATCH FULL AD TO REVIVE');
             resumeReviveCountdown();
@@ -1388,9 +1444,11 @@ const AdMobManager = {
       this.adPlugin.addListener('onRewardedVideoAdFailedToLoad', (err) => {
         console.warn('[AdMob] Ad load failed:', err);
         this.isPrepared = false;
-        if (this.pendingAction === 'nameChange') {
+        if (this.pendingAction === 'nameChangeUnlock') {
           this.showNotice('⚠️ AD FAILED TO LOAD', 'PLEASE CHECK NETWORK & TRY AGAIN');
-          resetSaveNameBtn();
+          const msgEl = document.getElementById('settingsMsg');
+          if (msgEl) { msgEl.textContent = '⚠️ Ad failed to load. Please try again.'; msgEl.className = 'settings-msg error'; }
+          resetWatchNameAdBtn();
         }
       });
     } catch (_) {}
@@ -1446,26 +1504,26 @@ const AdMobManager = {
     }
   },
 
-  async requestNameChangeWithAd(newName) {
+  async requestNameChangeUnlockWithAd() {
     // 1. Strict check: Internet connection
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       this.showNotice('⚠️ NO INTERNET', 'CONNECT TO INTERNET TO CHANGE NAME');
       if (typeof SFX !== 'undefined' && SFX.collision) SFX.collision();
       const msgEl = document.getElementById('settingsMsg');
       if (msgEl) { msgEl.textContent = '⚠️ Connect to internet to change name.'; msgEl.className = 'settings-msg error'; }
-      return; // STRICT: DO NOT CHANGE NAME
+      return; // STRICT: DO NOT UNLOCK
     }
 
-    const saveBtn = document.getElementById('saveNameBtn');
-    if (saveBtn) {
-      saveBtn.disabled = true;
-      saveBtn.textContent = '⏳ Loading Ad…';
+    const watchBtn = document.getElementById('watchNameAdBtn');
+    if (watchBtn) {
+      watchBtn.disabled = true;
+      watchBtn.textContent = '⏳ Loading Ad…';
     }
 
     if (this.adPlugin && this.isInitialized) {
       this.rewardGranted = false;
-      this.pendingAction = 'nameChange';
-      this.pendingName = newName;
+      this.pendingAction = 'nameChangeUnlock';
+      this.pendingName = null;
 
       try {
         await this.adPlugin.showRewardVideoAd();
@@ -1476,13 +1534,12 @@ const AdMobManager = {
         const msgEl = document.getElementById('settingsMsg');
         if (msgEl) { msgEl.textContent = '⚠️ Ad failed to load. Please try again.'; msgEl.className = 'settings-msg error'; }
         this.pendingAction = null;
-        this.pendingName = null;
-        resetSaveNameBtn();
-        return; // STRICT: DO NOT CHANGE NAME
+        resetWatchNameAdBtn();
+        return; // STRICT: DO NOT UNLOCK
       }
     } else {
-      // In web browser (non-Capacitor): save directly if online
-      commitSettingsName(newName);
+      // In web browser (non-Capacitor): unlock input directly if online
+      unlockNameChangeField();
     }
   }
 };
@@ -2054,6 +2111,8 @@ function openSettingsAndInit(){
 
 ['settingsBtnMob','settingsBtn2','overlaySettingsBtn','menuNavSettings'].forEach(id=>document.getElementById(id)?.addEventListener('click',openSettingsAndInit));
 document.getElementById('closeSettingsBtn')?.addEventListener('click',closeSettings);
+document.getElementById('watchNameAdBtn')?.addEventListener('click',() => AdMobManager.requestNameChangeUnlockWithAd());
+document.getElementById('cancelNameChangeBtn')?.addEventListener('click',lockNameChangeField);
 document.getElementById('saveNameBtn')?.addEventListener('click',saveSettingsName);
 document.getElementById('settingsNameInput')?.addEventListener('keydown',e=>{ if(e.key==='Enter') saveSettingsName(); });
 
@@ -2087,6 +2146,24 @@ document.addEventListener('click', (e) => {
   if (closeSet) {
     e.preventDefault();
     closeSettings();
+    return;
+  }
+  const watchAdBtn = e.target.closest('#watchNameAdBtn');
+  if (watchAdBtn) {
+    e.preventDefault();
+    AdMobManager.requestNameChangeUnlockWithAd();
+    return;
+  }
+  const cancelBtn = e.target.closest('#cancelNameChangeBtn');
+  if (cancelBtn) {
+    e.preventDefault();
+    lockNameChangeField();
+    return;
+  }
+  const saveName = e.target.closest('#saveNameBtn');
+  if (saveName) {
+    e.preventDefault();
+    saveSettingsName();
     return;
   }
   if (e.target.id === 'lbModal') {

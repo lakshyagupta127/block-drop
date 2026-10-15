@@ -1266,6 +1266,77 @@ body.in-menu #gameCanvas {
   line-height: 1;
 }
 
+/* 2-stage Name Change UI */
+#nameAdWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.settings-ad-btn {
+  background: linear-gradient(180deg, #2a2050 0%, #15102d 100%);
+  border: 1.5px solid #a855f7;
+  color: #f3e8ff;
+  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.25);
+}
+.settings-ad-btn:hover {
+  border-color: #c084fc;
+  box-shadow: 0 6px 18px rgba(168, 85, 247, 0.4);
+}
+
+#nameInputWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  animation: fadeInDown 0.25s ease;
+}
+
+.name-unlocked-badge {
+  background: rgba(0, 240, 240, 0.1);
+  border: 1px solid rgba(0, 240, 240, 0.4);
+  color: #00f0f0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: center;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 10px rgba(0, 240, 240, 0.15);
+}
+
+.name-input-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.name-input-actions .save-name-confirm-btn {
+  flex: 2;
+  background: linear-gradient(180deg, #1b5e20 0%, #0d3813 100%);
+  border-color: #00e676;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 230, 118, 0.3);
+}
+.name-input-actions .save-name-confirm-btn:hover {
+  filter: brightness(1.2);
+  border-color: #69f0ae;
+}
+
+.name-input-actions .settings-cancel-btn {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 12px;
+  background: #1c1c2e;
+  border: 1px solid #444;
+  color: #bbb;
+}
+.name-input-actions .settings-cancel-btn:hover {
+  background: #2a2a3e;
+  color: #fff;
+}
+
 .settings-msg {
   font-size: 12px;
   text-align: center;

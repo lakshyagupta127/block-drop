@@ -226,15 +226,31 @@
           <span class="current-name-label">Unique ID:</span>
           <span class="current-name-value" id="settingsPlayerId" style="color:#00f0f0; font-family:'Courier New',monospace; font-weight:bold; letter-spacing:1px;">—</span>
         </div>
-        <div id="nameChangeForm">
-          <input type="text" id="settingsNameInput" maxlength="20"
-            data-i18n="name_placeholder" placeholder="Enter new name" autocomplete="off" spellcheck="false"/>
-          <div class="name-rules">2–20 characters • Your ID is permanent. Changing your name instantly renames all your past &amp; future leaderboard scores!</div>
-          <button class="retro-btn settings-save-btn" id="saveNameBtn">
+        <!-- Stage 1: Locked state with ad trigger (Input space is hidden until ad is watched) -->
+        <div id="nameAdWrap">
+          <div class="name-rules" style="margin-bottom:8px;">Watch a short sponsored video to unlock your name change input.</div>
+          <button class="retro-btn settings-save-btn settings-ad-btn" id="watchNameAdBtn">
             <span class="ad-badge">AD</span> 📺 <span>Watch Ad to Change Name</span>
           </button>
-          <div class="settings-msg" id="settingsMsg"></div>
         </div>
+
+        <!-- Stage 2: Name Input Field (ONLY displayed AFTER the ad is fully watched) -->
+        <div id="nameInputWrap" style="display:none;">
+          <div class="name-unlocked-badge">✨ Name Change Unlocked! Enter your new name below:</div>
+          <input type="text" id="settingsNameInput" maxlength="20"
+            data-i18n="name_placeholder" placeholder="Enter new name" autocomplete="off" spellcheck="false"/>
+          <div class="name-rules">2–20 characters • Changing your name updates your permanent ID across all past &amp; future leaderboard scores!</div>
+          <div class="name-input-actions">
+            <button class="retro-btn settings-save-btn save-name-confirm-btn" id="saveNameBtn">
+              ✔ <span>Save New Name</span>
+            </button>
+            <button class="retro-btn secondary settings-cancel-btn" id="cancelNameChangeBtn">
+              Cancel
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-msg" id="settingsMsg"></div>
         <div id="nameCooldownNotice" style="display:none"></div>
       </div>
 
