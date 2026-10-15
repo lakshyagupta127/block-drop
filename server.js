@@ -72,6 +72,11 @@ async function initDB() {
     );
     CREATE INDEX IF NOT EXISTS idx_scores_score ON scores(score DESC);
 
+    ALTER TABLE scores ADD COLUMN IF NOT EXISTS player_id INTEGER;
+    ALTER TABLE scores ADD COLUMN IF NOT EXISTS player_fp TEXT;
+    CREATE INDEX IF NOT EXISTS idx_scores_player_fp ON scores(player_fp);
+    CREATE INDEX IF NOT EXISTS idx_scores_player_id ON scores(player_id);
+
     CREATE TABLE IF NOT EXISTS used_nonces (
       nonce      TEXT PRIMARY KEY,
       used_at    TIMESTAMPTZ DEFAULT NOW()
@@ -92,6 +97,12 @@ async function initDB() {
     );
     CREATE INDEX IF NOT EXISTS idx_players_fp ON players(fingerprint);
     ALTER TABLE players ADD COLUMN IF NOT EXISTS best_score INTEGER DEFAULT 0;
+
+    -- Backfill older unlinked scores to matching players by name
+    UPDATE scores s
+    SET player_id = p.id, player_fp = p.fingerprint
+    FROM players p
+    WHERE s.player_fp IS NULL AND LOWER(s.name) = LOWER(p.name);
   `);
   console.log('[DB] Tables ready.');
 }
@@ -239,14 +250,23 @@ app.get('/api/scores', async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 10, 100);
     const { rows } = await query(
       `SELECT * FROM (
-         SELECT DISTINCT ON (LOWER(name)) id, name, score, level, lines, country_code, country_flag, created_at
-         FROM scores
-         ORDER BY LOWER(name), score DESC
+         SELECT DISTINCT ON (COALESCE(s.player_fp, LOWER(s.name)))
+           s.id,
+           COALESCE(p.name, s.name) AS name,
+           s.score,
+           s.level,
+           s.lines,
+           COALESCE(NULLIF(s.country_code, ''), p.country_code, '') AS country_code,
+           COALESCE(NULLIF(s.country_flag, ''), p.country_flag, '') AS country_flag,
+           s.created_at
+         FROM scores s
+         LEFT JOIN players p ON s.player_fp = p.fingerprint
+         ORDER BY COALESCE(s.player_fp, LOWER(s.name)), s.score DESC
        ) best_scores
        ORDER BY score DESC LIMIT $1`,
       [limit]
     );
-    const total = (await query('SELECT COUNT(DISTINCT LOWER(name)) AS total FROM scores')).rows[0].total;
+    const total = (await query('SELECT COUNT(DISTINCT COALESCE(player_fp, LOWER(name))) AS total FROM scores')).rows[0].total;
     res.json({ success: true, scores: rows, total: parseInt(total) });
   } catch (err) {
     console.error('GET /api/scores:', err.message);
@@ -257,7 +277,7 @@ app.get('/api/scores', async (req, res) => {
 app.post('/api/scores', scoreLimiter, async (req, res) => {
   try {
     const { name, score, level, lines, duration, device, gameToken,
-            country_code, country_flag } = req.body;
+            country_code, country_flag, fp } = req.body;
 
     if (!name || typeof name !== 'string')
       return res.status(400).json({ success: false, error: 'name required' });
@@ -284,7 +304,8 @@ app.post('/api/scores', scoreLimiter, async (req, res) => {
     await query('INSERT INTO used_nonces (nonce) VALUES ($1)', [nonce]);
 
     // Sanitise
-    const safeName     = String(name).trim().slice(0, 20) || 'Player';
+    const cleanFp      = String(fp || '').trim().slice(0, 128);
+    let safeName       = String(name).trim().slice(0, 20) || 'Player';
     const safeScore    = Math.floor(score);
     const safeLevel    = Math.max(1, Math.floor(level)    || 1);
     const safeLines    = Math.max(0, Math.floor(lines)    || 0);
@@ -293,20 +314,47 @@ app.post('/api/scores', scoreLimiter, async (req, res) => {
     const safeCC       = String(country_code || '').slice(0, 5);
     const safeCF       = String(country_flag || '').slice(0, 10);
 
+    // Look up or establish player by persistent unique fingerprint
+    let playerId = null;
+    if (cleanFp) {
+      let pRes = await query('SELECT * FROM players WHERE fingerprint = $1', [cleanFp]);
+      if (pRes.rows.length === 0) {
+        pRes = await query(
+          'INSERT INTO players (fingerprint, name, country_code, country_flag) VALUES ($1, $2, $3, $4) RETURNING *',
+          [cleanFp, safeName, safeCC, safeCF]
+        );
+      }
+      const player = pRes.rows[0];
+      playerId = player.id;
+      if (player.name && player.name !== 'Player') {
+        safeName = player.name;
+      }
+    }
+
     // Check existing best score for this player in scores table
-    const existingRes = await query(
-      `SELECT id, score FROM scores WHERE LOWER(name) = LOWER($1) ORDER BY score DESC`,
-      [safeName]
-    );
+    let existingRes;
+    if (cleanFp) {
+      existingRes = await query(
+        `SELECT id, score, name FROM scores
+         WHERE player_fp = $1 OR player_id = $2 OR (player_fp IS NULL AND LOWER(name) = LOWER($3))
+         ORDER BY score DESC`,
+        [cleanFp, playerId, safeName]
+      );
+    } else {
+      existingRes = await query(
+        `SELECT id, score, name FROM scores WHERE LOWER(name) = LOWER($1) ORDER BY score DESC`,
+        [safeName]
+      );
+    }
 
     let id;
     let bestPlayerScore = safeScore;
 
     if (existingRes.rows.length === 0) {
       const { rows } = await query(
-        `INSERT INTO scores (name, score, level, lines, duration_s, device, country_code, country_flag)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-        [safeName, safeScore, safeLevel, safeLines, safeDuration, safeDevice, safeCC, safeCF]
+        `INSERT INTO scores (player_id, player_fp, name, score, level, lines, duration_s, device, country_code, country_flag)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
+        [playerId, cleanFp || null, safeName, safeScore, safeLevel, safeLines, safeDuration, safeDevice, safeCC, safeCF]
       );
       id = rows[0].id;
     } else {
@@ -320,40 +368,67 @@ app.post('/api/scores', scoreLimiter, async (req, res) => {
            SET name=$1, score=$2, level=$3, lines=$4, duration_s=$5, device=$6,
                country_code= CASE WHEN $7 <> '' THEN $7 ELSE country_code END,
                country_flag= CASE WHEN $8 <> '' THEN $8 ELSE country_flag END,
+               player_id=COALESCE($9, player_id),
+               player_fp=COALESCE($10, player_fp),
                created_at=NOW()
-           WHERE id=$9`,
-          [safeName, safeScore, safeLevel, safeLines, safeDuration, safeDevice, safeCC, safeCF, id]
+           WHERE id=$11`,
+          [safeName, safeScore, safeLevel, safeLines, safeDuration, safeDevice, safeCC, safeCF, playerId, cleanFp || null, id]
         );
-      } else if (safeCC || safeCF) {
+      } else {
+        // Keep name and player link up-to-date even if score was not beaten
         await query(
           `UPDATE scores
-           SET country_code= CASE WHEN country_code = '' AND $1 <> '' THEN $1 ELSE country_code END,
-               country_flag= CASE WHEN country_flag = '' AND $2 <> '' THEN $2 ELSE country_flag END
-           WHERE id=$3`,
-          [safeCC, safeCF, id]
+           SET name=$1,
+               country_code= CASE WHEN country_code = '' AND $2 <> '' THEN $2 ELSE country_code END,
+               country_flag= CASE WHEN country_flag = '' AND $3 <> '' THEN $3 ELSE country_flag END,
+               player_id=COALESCE($4, player_id),
+               player_fp=COALESCE($5, player_fp)
+           WHERE id=$6`,
+          [safeName, safeCC, safeCF, playerId, cleanFp || null, id]
         );
       }
 
-      // Remove any older duplicate rows for this player so only their single best score remains in DB
+      // Remove any older duplicate rows for this player so only single best score remains
       if (existingRes.rows.length > 1) {
-        await query(
-          `DELETE FROM scores WHERE LOWER(name) = LOWER($1) AND id <> $2`,
-          [safeName, id]
-        );
+        if (cleanFp) {
+          await query(
+            `DELETE FROM scores
+             WHERE (player_fp = $1 OR player_id = $2 OR (player_fp IS NULL AND LOWER(name) = LOWER($3)))
+               AND id <> $4`,
+            [cleanFp, playerId, safeName, id]
+          );
+        } else {
+          await query(
+            `DELETE FROM scores WHERE LOWER(name) = LOWER($1) AND id <> $2`,
+            [safeName, id]
+          );
+        }
       }
     }
 
     // Update last session and best_score on player row
-    await query(
-      `UPDATE players
-       SET best_score=GREATEST(COALESCE(best_score, 0), $1),
-           last_score=$1, last_level=$2, last_lines=$3, last_played_at=NOW()
-       WHERE LOWER(name)=LOWER($4)`,
-      [safeScore, safeLevel, safeLines, safeName]
-    );
+    if (cleanFp) {
+      await query(
+        `UPDATE players
+         SET best_score=GREATEST(COALESCE(best_score, 0), $1),
+             last_score=$1, last_level=$2, last_lines=$3, last_played_at=NOW(),
+             country_code=CASE WHEN $4 <> '' THEN $4 ELSE country_code END,
+             country_flag=CASE WHEN $5 <> '' THEN $5 ELSE country_flag END
+         WHERE fingerprint=$6`,
+        [safeScore, safeLevel, safeLines, safeCC, safeCF, cleanFp]
+      );
+    } else {
+      await query(
+        `UPDATE players
+         SET best_score=GREATEST(COALESCE(best_score, 0), $1),
+             last_score=$1, last_level=$2, last_lines=$3, last_played_at=NOW()
+         WHERE LOWER(name)=LOWER($4)`,
+        [safeScore, safeLevel, safeLines, safeName]
+      );
+    }
 
     const rankRes = await query(
-      `SELECT COUNT(DISTINCT LOWER(name)) AS rank FROM scores WHERE score > $1`,
+      `SELECT COUNT(DISTINCT COALESCE(player_fp, LOWER(name))) AS rank FROM scores WHERE score > $1`,
       [bestPlayerScore]
     );
     const rank = parseInt(rankRes.rows[0].rank) + 1;
@@ -392,18 +467,18 @@ app.get('/api/player/stats', async (req, res) => {
     const agg = (await query(
       `SELECT MAX(score) AS "bestScore", MAX(level) AS "bestLevel",
               COUNT(*)   AS "totalGames", SUM(lines) AS "totalLines"
-       FROM scores WHERE name = $1`,
-      [player.name]
+       FROM scores WHERE player_fp = $1 OR LOWER(name) = LOWER($2)`,
+      [fp, player.name]
     )).rows[0];
 
     res.json({
       success:      true,
       isReturning:  !!player.last_played_at,
       name:         player.name,
-      bestScore:    parseInt(agg.bestScore)  || 0,
-      bestLevel:    parseInt(agg.bestLevel)  || 1,
-      totalGames:   parseInt(agg.totalGames) || 0,
-      totalLines:   parseInt(agg.totalLines) || 0,
+      bestScore:    parseInt(agg?.bestScore)  || player.best_score || 0,
+      bestLevel:    parseInt(agg?.bestLevel)  || player.last_level || 1,
+      totalGames:   parseInt(agg?.totalGames) || 0,
+      totalLines:   parseInt(agg?.totalLines) || 0,
       lastScore:    player.last_score    || 0,
       lastLevel:    player.last_level    || 1,
       lastLines:    player.last_lines    || 0,
@@ -423,10 +498,19 @@ app.get('/api/player', async (req, res) => {
     let pRes = await query('SELECT * FROM players WHERE fingerprint = $1', [fp]);
     if (pRes.rows.length === 0) {
       await query('INSERT INTO players (fingerprint, name) VALUES ($1, $2)', [fp, 'Player']);
-      return res.json({ success: true, name: 'Player', canChangeName: true, nextChangeAt: null, cooldownDays: 0 });
+      pRes = await query('SELECT * FROM players WHERE fingerprint = $1', [fp]);
     }
     const player = pRes.rows[0];
-    res.json({ success: true, name: player.name, canChangeName: true, nextChangeAt: null, cooldownDays: 0 });
+    const playerId = 'BD-' + String(player.id).padStart(5, '0');
+    res.json({
+      success: true,
+      id: player.id,
+      playerId,
+      name: player.name,
+      canChangeName: true,
+      nextChangeAt: null,
+      cooldownDays: 0
+    });
   } catch (err) {
     console.error('GET /api/player:', err.message);
     res.status(500).json({ success: false, error: 'Failed to load player' });
@@ -453,26 +537,56 @@ app.post('/api/player/name', rateLimit({ windowMs: 60*1000, max: 10 }), async (r
 
   try {
     const pRes = await query('SELECT * FROM players WHERE fingerprint = $1', [cleanFp]);
+    let playerId;
+    let oldName = null;
 
     if (pRes.rows.length === 0) {
-      await query(
-        'INSERT INTO players (fingerprint, name, name_changed_at) VALUES ($1, $2, NOW())',
+      const insRes = await query(
+        'INSERT INTO players (fingerprint, name, name_changed_at) VALUES ($1, $2, NOW()) RETURNING id',
         [cleanFp, cleanName]
       );
+      playerId = insRes.rows[0].id;
     } else {
+      playerId = pRes.rows[0].id;
+      oldName  = pRes.rows[0].name;
       await query(
         'UPDATE players SET name=$1, name_changed_at=NOW() WHERE fingerprint=$2',
         [cleanName, cleanFp]
       );
     }
 
+    // ── ADAPT LEADERBOARD & PAST SCORES TO NEW NAME ─────────────
+    // Any existing score recorded by this player ID or previously under their old name
+    // is immediately updated so the leaderboard adapts to the new name.
+    if (oldName) {
+      await query(
+        `UPDATE scores
+         SET name=$1, player_fp=$2, player_id=$3
+         WHERE player_fp=$2
+            OR player_id=$3
+            OR (player_fp IS NULL AND LOWER(name)=LOWER($4))`,
+        [cleanName, cleanFp, playerId, oldName]
+      );
+    } else {
+      await query(
+        `UPDATE scores
+         SET name=$1, player_fp=$2, player_id=$3
+         WHERE player_fp=$2 OR player_id=$3`,
+        [cleanName, cleanFp, playerId]
+      );
+    }
+
+    const formattedId = 'BD-' + String(playerId).padStart(5, '0');
+
     res.json({
       success: true,
+      id: playerId,
+      playerId: formattedId,
       name: cleanName,
       canChangeName: true,
       nextChangeAt: null,
       cooldownDays: 0,
-      message: 'Name updated successfully',
+      message: 'Name and leaderboard updated successfully',
     });
   } catch (err) {
     console.error('POST /api/player/name:', err.message);
@@ -485,7 +599,14 @@ app.delete('/api/player/:fp', rateLimit({ windowMs: 60*1000, max: 3 }), async (r
   const fp = String(req.params.fp || '').trim().slice(0, 128);
   if (!fp) return res.status(400).json({ success: false, error: 'fingerprint required' });
   try {
+    const pRes = await query('SELECT name FROM players WHERE fingerprint = $1', [fp]);
+    const playerName = pRes.rows[0]?.name;
     await query('DELETE FROM players WHERE fingerprint = $1', [fp]);
+    if (playerName) {
+      await query('DELETE FROM scores WHERE player_fp = $1 OR LOWER(name) = LOWER($2)', [fp, playerName]);
+    } else {
+      await query('DELETE FROM scores WHERE player_fp = $1', [fp]);
+    }
     res.json({ success: true, message: 'Your data has been deleted.' });
   } catch (err) {
     console.error('DELETE /api/player:', err.message);

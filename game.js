@@ -129,36 +129,32 @@ function isMobileDevice() {
 const PLAYER_FP_KEY = 'bd_player_fp';
 
 async function getFingerprint() {
-  const cached = localStorage.getItem(PLAYER_FP_KEY);
+  let cached = localStorage.getItem(PLAYER_FP_KEY);
   if (cached) return cached;
-  const signals = [
-    navigator.userAgent, navigator.language,
-    screen.width+'x'+screen.height, screen.colorDepth,
-    new Date().getTimezoneOffset(),
-    navigator.hardwareConcurrency||0, navigator.platform||'',
-  ].join('|');
-  const msgBuffer  = new TextEncoder().encode(signals);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const fp = Array.from(new Uint8Array(hashBuffer)).map(b=>b.toString(16).padStart(2,'0')).join('');
-  localStorage.setItem(PLAYER_FP_KEY, fp);
-  return fp;
+  const randomPart = (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'usr_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 12);
+  cached = randomPart;
+  localStorage.setItem(PLAYER_FP_KEY, cached);
+  return cached;
 }
 
 // ── Player profile state ───────────────────────
 const PLAYER_NAME_KEY = 'bd_player_name';
-let _playerFp       = null;
-let _playerName     = localStorage.getItem(PLAYER_NAME_KEY) || 'Player';
-let _canChangeName  = true;
-let _nextChangeAt   = null;
-let _personalBest   = 0;
-let _totalGames     = 0;
-let _totalLines     = 0;
-let _bestLevel      = 1;
-let _lastScore      = 0;
-let _lastLevel      = 1;
-let _lastLines      = 0;
-let _lastPlayedAt   = null;
-let _isReturning    = false;
+let _playerFp          = null;
+let _playerIdFormatted = null;
+let _playerName        = localStorage.getItem(PLAYER_NAME_KEY) || 'Player';
+let _canChangeName     = true;
+let _nextChangeAt      = null;
+let _personalBest      = 0;
+let _totalGames        = 0;
+let _totalLines        = 0;
+let _bestLevel         = 1;
+let _lastScore         = 0;
+let _lastLevel         = 1;
+let _lastLines         = 0;
+let _lastPlayedAt      = null;
+let _isReturning       = false;
 
 async function loadPlayerProfile() {
   try {
@@ -176,6 +172,11 @@ async function loadPlayerProfile() {
       }
       _canChangeName = profileData.canChangeName;
       _nextChangeAt  = profileData.nextChangeAt;
+      if (profileData.playerId) {
+        _playerIdFormatted = profileData.playerId;
+      } else if (_playerFp) {
+        _playerIdFormatted = 'BD-' + _playerFp.slice(0, 6).toUpperCase();
+      }
     }
     if (statsData.success) {
       _personalBest = statsData.bestScore    || 0;
@@ -209,6 +210,11 @@ function updatePlayerUI() {
   const nameEl = document.getElementById('playerNameDisplay');
   if (nameEl) nameEl.textContent = _playerName;
 
+  const idEl = document.getElementById('settingsPlayerId');
+  if (idEl) {
+    idEl.textContent = _playerIdFormatted || (_playerFp ? 'BD-' + _playerFp.slice(0, 6).toUpperCase() : 'BD-00001');
+  }
+
   const tagEl = document.getElementById('overlayNameTag');
   if (tagEl) {
     if (_isReturning && _playerName && _playerName !== 'Player') {
@@ -218,7 +224,7 @@ function updatePlayerUI() {
           <div class="player-badge-text">
             <span class="player-badge-sub">Welcome back,</span>
             <strong class="player-badge-name">${_playerName}!</strong>
-            <span class="player-badge-id">PLAYER ID: ${_playerFp ? _playerFp.slice(0, 10).toUpperCase() : 'BD_77'} | LEVEL ${_bestLevel || 1}</span>
+            <span class="player-badge-id">PLAYER ID: ${_playerIdFormatted || (_playerFp ? _playerFp.slice(0, 10).toUpperCase() : 'BD_77')} | LEVEL ${_bestLevel || 1}</span>
           </div>
         </div>`;
       tagEl.className   = 'overlay-name-tag welcome-back';
@@ -302,10 +308,12 @@ function openSettings() {
   const modal = document.getElementById('settingsModal');
   if (!modal) return;
   const curEl = document.getElementById('settingsCurrentName');
+  const idEl  = document.getElementById('settingsPlayerId');
   const form  = document.getElementById('nameChangeForm');
   const lock  = document.getElementById('nameCooldownNotice');
   const msgEl = document.getElementById('settingsMsg');
   if (curEl) curEl.textContent = _playerName || 'Player';
+  if (idEl)  idEl.textContent  = _playerIdFormatted || (_playerFp ? 'BD-' + _playerFp.slice(0, 6).toUpperCase() : 'BD-00001');
   if (msgEl) { msgEl.textContent=''; msgEl.className='settings-msg'; }
   const inp = document.getElementById('settingsNameInput');
   if (inp) inp.value = '';
@@ -381,13 +389,16 @@ async function commitSettingsName(newName) {
     if (data.success) {
       _playerName = data.name;
       _canChangeName = true;
+      if (data.playerId) _playerIdFormatted = data.playerId;
       localStorage.setItem(PLAYER_NAME_KEY, _playerName);
       updatePlayerUI();
       if (typeof SFX !== 'undefined' && SFX.clear) SFX.clear(1);
       const curEl = document.getElementById('settingsCurrentName');
       if (curEl) curEl.textContent = _playerName;
-      if (msgEl) { msgEl.textContent = '✔ Name updated!'; msgEl.className = 'settings-msg success'; }
-      AdMobManager.showNotice('✔ NAME UPDATED', `Display name is now ${_playerName}`);
+      const idEl = document.getElementById('settingsPlayerId');
+      if (idEl) idEl.textContent = _playerIdFormatted || ('BD-' + _playerFp.slice(0, 6).toUpperCase());
+      if (msgEl) { msgEl.textContent = '✔ Name & leaderboard scores updated!'; msgEl.className = 'settings-msg success'; }
+      AdMobManager.showNotice('✔ NAME UPDATED', `Scores adapted for ${_playerName}`);
       const inp = document.getElementById('settingsNameInput');
       if (inp) inp.value = '';
     } else {
@@ -432,6 +443,7 @@ async function apiSaveScore(name, score, level, lines) {
     const res = await fetch(`${API}/scores`,{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
+        fp:           _playerFp,
         name, score, level, lines, duration,
         device:       detectDevice(),
         gameToken:    _gameToken,
