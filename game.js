@@ -397,6 +397,7 @@ function resetWatchNameAdBtn() {
 
 function openSettings() {
   try { SFX.click(); } catch(_) {}
+  AdMobManager.showMenuBanner();
   const modal = document.getElementById('settingsModal');
   if (!modal) return;
   const curEl = document.getElementById('settingsCurrentName');
@@ -1534,12 +1535,28 @@ function closeCongratsModal(resumeTimer = true) {
   }
 }
 
+// ── Interstitial & Ad Persistence Keys ──────────────
+const INTERSTITIAL_COUNT_KEY = 'bd_games_since_interstitial';
+const PENDING_INTERSTITIAL_KEY = 'bd_pending_interstitial';
+
 // ── Google AdMob Controller ──
 const AdMobManager = {
   appId: 'ca-app-pub-8122097857797560~6769216530',
   rewardedAdId: 'ca-app-pub-8122097857797560/7568127036',
   // Official Google Rewarded Video Test Ad Unit ID for Android
   testRewardedAdId: 'ca-app-pub-3940256099942544/5224354917',
+
+  // Adaptive Banner Ad Unit IDs
+  bannerAdId: 'ca-app-pub-8122097857797560/YOUR_BANNER_ID',
+  testBannerAdId: 'ca-app-pub-3940256099942544/6300978111',
+  isBannerShowing: false,
+
+  // Full-Screen Interstitial Ad Unit IDs
+  interstitialAdId: 'ca-app-pub-8122097857797560/YOUR_INTERSTITIAL_ID',
+  testInterstitialAdId: 'ca-app-pub-3940256099942544/1033173712',
+  isInterstitialPrepared: false,
+  _onInterstitialClosed: null,
+
   isInitialized: false,
   isPrepared: false,
   activeAdUnitId: null,
@@ -1547,6 +1564,10 @@ const AdMobManager = {
   rewardGranted: false,
   pendingAction: null,
   pendingName: null,
+
+  hasPendingInterstitial() {
+    return localStorage.getItem(PENDING_INTERSTITIAL_KEY) === 'true';
+  },
 
   async init() {
     try {
@@ -1568,6 +1589,12 @@ const AdMobManager = {
         this.isInitialized = true;
         this.setupListeners();
         this.preloadRewarded();
+        this.preloadInterstitial();
+
+        // Show bottom adaptive banner on menu if game is not currently running
+        if (typeof gameRunning === 'undefined' || !gameRunning) {
+          this.showMenuBanner();
+        }
         console.log('[AdMob] AdMob initialized successfully');
       } else {
         console.log('[AdMob] Running in web browser mode (direct fallback for browser testing)');
@@ -1591,6 +1618,7 @@ const AdMobManager = {
   setupListeners() {
     if (!this.adPlugin) return;
     try {
+      // Rewarded Video Listeners
       this.adPlugin.addListener('onRewardedVideoAdReward', () => {
         console.log('[AdMob] Rewarded completed! Action:', this.pendingAction);
         this.rewardGranted = true;
@@ -1601,7 +1629,7 @@ const AdMobManager = {
         }
       });
       this.adPlugin.addListener('onRewardedVideoAdDismissed', () => {
-        console.log('[AdMob] Ad dismissed. Reward granted:', this.rewardGranted);
+        console.log('[AdMob] Rewarded dismissed. Reward granted:', this.rewardGranted);
         if (!this.rewardGranted) {
           // Player dismissed without completing ad
           if (this.pendingAction === 'nameChangeUnlock') {
@@ -1621,7 +1649,7 @@ const AdMobManager = {
         this.preloadRewarded();
       });
       this.adPlugin.addListener('onRewardedVideoAdFailedToLoad', (err) => {
-        console.warn('[AdMob] Ad load failed event:', err);
+        console.warn('[AdMob] Rewarded failed to load event:', err);
         this.isPrepared = false;
         if (this.pendingAction === 'nameChangeUnlock') {
           this.showNotice('⚠️ AD FAILED TO LOAD', 'PLEASE CHECK NETWORK & TRY AGAIN');
@@ -1629,6 +1657,51 @@ const AdMobManager = {
           if (msgEl) { msgEl.textContent = '⚠️ Ad failed to load. Please try again.'; msgEl.className = 'settings-msg error'; }
           resetWatchNameAdBtn();
         }
+      });
+
+      // Interstitial Listeners
+      this.adPlugin.addListener('onInterstitialAdLoaded', () => {
+        console.log('[AdMob] Interstitial loaded & ready');
+        this.isInterstitialPrepared = true;
+      });
+      this.adPlugin.addListener('onInterstitialAdShowed', () => {
+        console.log('[AdMob] Interstitial showed on screen');
+        // Player has entered an interstitial session; if they close the app now, flag persists
+        localStorage.setItem(PENDING_INTERSTITIAL_KEY, 'true');
+      });
+      this.adPlugin.addListener('onInterstitialAdDismissed', () => {
+        console.log('[AdMob] Interstitial dismissed. User watched ad.');
+        // User watched/dismissed the ad — clear the pending requirement
+        localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+        this.isInterstitialPrepared = false;
+        this.preloadInterstitial();
+        if (typeof this._onInterstitialClosed === 'function') {
+          const cb = this._onInterstitialClosed;
+          this._onInterstitialClosed = null;
+          cb();
+        }
+      });
+      this.adPlugin.addListener('onInterstitialAdFailedToLoad', (err) => {
+        console.warn('[AdMob] Interstitial failed to load event:', err);
+        this.isInterstitialPrepared = false;
+      });
+      this.adPlugin.addListener('onInterstitialAdFailedToShow', (err) => {
+        console.warn('[AdMob] Interstitial failed to show event:', err);
+        localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+        if (typeof this._onInterstitialClosed === 'function') {
+          const cb = this._onInterstitialClosed;
+          this._onInterstitialClosed = null;
+          cb();
+        }
+      });
+
+      // Banner Listeners
+      this.adPlugin.addListener('onBannerAdLoaded', () => {
+        console.log('[AdMob] Banner loaded successfully');
+        this.isBannerShowing = true;
+      });
+      this.adPlugin.addListener('onBannerAdFailedToLoad', (err) => {
+        console.warn('[AdMob] Banner failed to load:', err);
       });
     } catch (_) {}
   },
@@ -1652,7 +1725,7 @@ const AdMobManager = {
       console.warn('[AdMob] Production ad prepare failed, trying test ad unit fallback:', err?.message || err);
     }
 
-    // 2. If production ad has No Fill (Error 3) or is unverified, fall back to official test ad unit
+    // 2. Fall back to official test ad unit
     try {
       console.log('[AdMob] Preloading test ad unit:', this.testRewardedAdId);
       await this.adPlugin.prepareRewardVideoAd({
@@ -1665,6 +1738,41 @@ const AdMobManager = {
     } catch (err2) {
       console.warn('[AdMob] Test ad prepare also failed:', err2?.message || err2);
       this.isPrepared = false;
+    }
+  },
+
+  async preloadInterstitial() {
+    if (!this.adPlugin || !this.isInitialized) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+
+    // 1. Try production interstitial ID if set
+    if (this.interstitialAdId && !this.interstitialAdId.includes('YOUR_')) {
+      try {
+        console.log('[AdMob] Preloading production interstitial:', this.interstitialAdId);
+        await this.adPlugin.prepareInterstitial({
+          adId: this.interstitialAdId,
+          isTesting: false
+        });
+        this.isInterstitialPrepared = true;
+        console.log('[AdMob] Production interstitial ready');
+        return;
+      } catch (err) {
+        console.warn('[AdMob] Production interstitial prepare failed, trying test fallback:', err?.message || err);
+      }
+    }
+
+    // 2. Test interstitial fallback
+    try {
+      console.log('[AdMob] Preloading test interstitial:', this.testInterstitialAdId);
+      await this.adPlugin.prepareInterstitial({
+        adId: this.testInterstitialAdId,
+        isTesting: true
+      });
+      this.isInterstitialPrepared = true;
+      console.log('[AdMob] Test interstitial loaded & ready');
+    } catch (err2) {
+      console.warn('[AdMob] Test interstitial prepare also failed:', err2?.message || err2);
+      this.isInterstitialPrepared = false;
     }
   },
 
@@ -1681,6 +1789,93 @@ const AdMobManager = {
     }
 
     await this.adPlugin.showRewardVideoAd();
+  },
+
+  async showInterstitialAd(onClosed) {
+    if (!this.adPlugin || !this.isInitialized) {
+      localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+      if (onClosed) onClosed();
+      return;
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      this.showNotice('⚠️ NO INTERNET', 'CONNECT TO INTERNET TO CONTINUE');
+      return;
+    }
+
+    this._onInterstitialClosed = onClosed;
+    localStorage.setItem(PENDING_INTERSTITIAL_KEY, 'true');
+
+    if (!this.isInterstitialPrepared) {
+      console.log('[AdMob] Interstitial not ready yet, loading on-demand...');
+      await this.preloadInterstitial();
+    }
+
+    if (!this.isInterstitialPrepared) {
+      console.warn('[AdMob] Interstitial could not be loaded, bypassing');
+      localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+      if (onClosed) onClosed();
+      return;
+    }
+
+    try {
+      await this.adPlugin.showInterstitial();
+    } catch (err) {
+      console.warn('[AdMob] Interstitial show failed:', err);
+      localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+      this.isInterstitialPrepared = false;
+      if (onClosed) onClosed();
+    }
+  },
+
+  async showMenuBanner() {
+    if (!this.adPlugin || !this.isInitialized) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    if (typeof gameRunning !== 'undefined' && gameRunning) return;
+    if (this.isBannerShowing) return;
+
+    // 1. Try production banner ID if provided
+    const prodBanner = (this.bannerAdId && !this.bannerAdId.includes('YOUR_')) ? this.bannerAdId : null;
+    if (prodBanner) {
+      try {
+        console.log('[AdMob] Showing production adaptive banner:', prodBanner);
+        await this.adPlugin.showBanner({
+          adId: prodBanner,
+          adSize: 'ADAPTIVE_BANNER',
+          position: 'BOTTOM_CENTER',
+          margin: 0,
+          isTesting: false
+        });
+        this.isBannerShowing = true;
+        return;
+      } catch (err) {
+        console.warn('[AdMob] Prod banner show failed, trying test banner:', err?.message || err);
+      }
+    }
+
+    // 2. Test banner fallback
+    try {
+      console.log('[AdMob] Showing test adaptive banner:', this.testBannerAdId);
+      await this.adPlugin.showBanner({
+        adId: this.testBannerAdId,
+        adSize: 'ADAPTIVE_BANNER',
+        position: 'BOTTOM_CENTER',
+        margin: 0,
+        isTesting: true
+      });
+      this.isBannerShowing = true;
+    } catch (err2) {
+      console.warn('[AdMob] Test banner show failed:', err2?.message || err2);
+    }
+  },
+
+  async hideBannerForGame() {
+    if (!this.adPlugin) return;
+    try {
+      await this.adPlugin.hideBanner();
+      this.isBannerShowing = false;
+      console.log('[AdMob] Banner hidden for active gameplay');
+    } catch (_) {}
   },
 
   async requestReviveWithAd() {
@@ -1866,8 +2061,64 @@ function fxReviveClear(topRows) {
   }
 }
 
+// ── Interstitial Triggers & Frequency Capping ────────────────────────
+function shouldTriggerGameOverInterstitial() {
+  const gCount = parseInt(localStorage.getItem(INTERSTITIAL_COUNT_KEY) || '0', 10);
+  return gCount >= 4; // Triggers automatically every 4th or 5th game
+}
+
+function handlePlayAgainClick() {
+  if (AdMobManager.hasPendingInterstitial()) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      AdMobManager.showNotice('⚠️ NO INTERNET', 'CONNECT TO INTERNET TO PLAY');
+      return;
+    }
+    AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
+    AdMobManager.showInterstitialAd(() => {
+      startGame();
+    });
+    return;
+  }
+
+  if (shouldTriggerGameOverInterstitial() && !_hasRevivedThisGame) {
+    localStorage.setItem(INTERSTITIAL_COUNT_KEY, '0');
+    AdMobManager.showInterstitialAd(() => {
+      startGame();
+    });
+  } else {
+    startGame();
+  }
+}
+
+function handleGoMenuClick() {
+  if (shouldTriggerGameOverInterstitial() && !_hasRevivedThisGame) {
+    localStorage.setItem(INTERSTITIAL_COUNT_KEY, '0');
+    AdMobManager.showInterstitialAd(() => {
+      returnToMenu();
+    });
+  } else {
+    returnToMenu();
+  }
+}
+
 // ── Game flow ──────────────────────────────────
 async function startGame() {
+  // Check if player has a pending interstitial from previously closing the app
+  if (AdMobManager.hasPendingInterstitial()) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      AdMobManager.showNotice('⚠️ NO INTERNET', 'CONNECT TO INTERNET TO PLAY');
+      return;
+    }
+    AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
+    AdMobManager.showInterstitialAd(() => {
+      startGame();
+    });
+    return;
+  }
+
+  // Hide banner during active gameplay
+  AdMobManager.hideBannerForGame();
+
   document.body.classList.remove('in-menu');
   try{ if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume(); }catch(_){}
   resetReviveState();
@@ -1890,6 +2141,12 @@ function endGame() {
   stopHints();
   startReviveCountdown();
   syncControlButtons();
+
+  // Increment games count for interstitial frequency cap (every 4th/5th game)
+  const gCount = parseInt(localStorage.getItem(INTERSTITIAL_COUNT_KEY) || '0', 10) + 1;
+  localStorage.setItem(INTERSTITIAL_COUNT_KEY, gCount);
+  console.log(`[AdMob] Games played since last interstitial: ${gCount}`);
+
   // Score is auto-saved with the player's saved name — no name prompt needed
   autoSaveScore();
 }
@@ -1941,6 +2198,7 @@ function returnToMenu() {
     if (lang) applyLanguage(lang);
   }
   updatePlayerUI();
+  AdMobManager.showMenuBanner();
 }
 
 function syncPauseBtn() {
@@ -1965,6 +2223,7 @@ function syncControlButtons() {
 // ── Leaderboard ────────────────────────────────
 async function openLB() {
   try { SFX.click(); } catch(_) {}
+  AdMobManager.showMenuBanner();
   const modal=document.getElementById('lbModal');
   if (!modal) return;
   const tbody=document.getElementById('lbBody');
@@ -2137,10 +2396,11 @@ function showGameOverOverlay(rank, bestScore) {
     <button class="retro-btn secondary" id="goLbBtn">🏆 Leaderboard</button>
     <button class="retro-btn secondary" id="goMenuBtn">🏠 Return to Menu</button>
   `);
+  AdMobManager.showMenuBanner();
   document.getElementById('overlayReviveBtn')?.addEventListener('click', handleReviveClick);
-  document.getElementById('restartBtn').addEventListener('click', startGame);
+  document.getElementById('restartBtn').addEventListener('click', handlePlayAgainClick);
   document.getElementById('goLbBtn').addEventListener('click', openLB);
-  document.getElementById('goMenuBtn').addEventListener('click', returnToMenu);
+  document.getElementById('goMenuBtn').addEventListener('click', handleGoMenuClick);
   // Refresh stats
   if(_playerFp){
     apiFetch(`/api/player/stats?fp=${encodeURIComponent(_playerFp)}`)
@@ -2385,6 +2645,18 @@ document.getElementById('settingsNameInput')?.addEventListener('keydown',e=>{ if
 
 // Global event delegation guaranteeing all modal open/close actions fire
 document.addEventListener('click', (e) => {
+  const restartClick = e.target.closest('#restartBtn');
+  if (restartClick) {
+    e.preventDefault();
+    handlePlayAgainClick();
+    return;
+  }
+  const goMenuClick = e.target.closest('#goMenuBtn');
+  if (goMenuClick) {
+    e.preventDefault();
+    handleGoMenuClick();
+    return;
+  }
   const reviveClick = e.target.closest('#overlayReviveBtn, #reviveBtn');
   if (reviveClick) {
     e.preventDefault();

@@ -856,7 +856,8 @@ body.in-menu #gameCanvas {
 .lb-modal-top500 {
   max-width: 520px;
   width: 95vw;
-  max-height: 88vh;
+  max-height: 82vh;
+  margin-bottom: 54px;
   padding: 20px 16px;
   gap: 10px;
 }
@@ -1419,7 +1420,8 @@ body.in-menu #gameCanvas {
   min-width: 300px;
   max-width: 480px;
   width: 94vw;
-  max-height: 88vh;
+  max-height: 82vh;
+  margin-bottom: 54px;
 }
 
 .settings-section {
