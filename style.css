@@ -853,39 +853,288 @@ body.in-menu #gameCanvas {
 .modal input[type="text"]:focus { border-color: #88f; }
 
 /* Leaderboard table */
+.lb-modal-top500 {
+  max-width: 520px;
+  width: 95vw;
+  max-height: 88vh;
+  padding: 20px 16px;
+  gap: 10px;
+}
+
+.lb-top500-sub {
+  font-size: 11px;
+  color: #00f0f0;
+  letter-spacing: 1px;
+  margin-top: -6px;
+}
+
+.lb-player-rank-banner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: linear-gradient(90deg, rgba(0, 240, 240, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%);
+  border: 1px solid rgba(0, 240, 240, 0.4);
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.lb-player-rank-banner .lpb-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lb-player-rank-banner .lpb-icon {
+  font-size: 22px;
+}
+
+.lb-player-rank-banner .lpb-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.lb-player-rank-banner .lpb-text strong {
+  font-size: 13px;
+  color: #ffffff;
+}
+
+.lb-player-rank-banner .lpb-text small {
+  font-size: 11px;
+  color: #00f0f0;
+}
+
+.lpb-reward-pill {
+  background: #00e676;
+  color: #0d2818;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.lb-table-wrap {
+  width: 100%;
+  max-height: 52vh;
+  overflow-y: auto;
+  border: 1px solid #2a2a44;
+  border-radius: 8px;
+  background: #090914;
+  scrollbar-width: thin;
+  scrollbar-color: #00f0f0 #121224;
+}
+
 #lbTable {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 12px;
 }
 
-#lbTable th {
+#lbTable thead th {
+  position: sticky;
+  top: 0;
+  background: #151528;
   color: var(--muted);
   font-size: 11px;
   letter-spacing: 1px;
   text-transform: uppercase;
-  border-bottom: 1px solid var(--border);
-  padding: 6px 8px;
+  border-bottom: 1.5px solid #2a2a44;
+  padding: 8px 8px;
   text-align: left;
+  z-index: 2;
 }
 
 #lbTable td {
   padding: 7px 8px;
-  border-bottom: 1px solid #222;
+  border-bottom: 1px solid #1a1a2e;
   color: var(--text);
 }
 
-#lbTable tr:first-child td { color: #ffd700; }
-#lbTable tr:nth-child(2) td { color: #c0c0c0; }
-#lbTable tr:nth-child(3) td { color: #cd7f32; }
+#lbTable tr:first-child td { color: #ffd700; font-weight: bold; }
+#lbTable tr:nth-child(2) td { color: #c0c0c0; font-weight: bold; }
+#lbTable tr:nth-child(3) td { color: #cd7f32; font-weight: bold; }
 
-#lbTable tr:hover td { background: rgba(255,255,255,0.04); }
+#lbTable tr:hover td { background: rgba(255,255,255,0.05); }
+
+/* Highlighted current player row in Top 500 */
+#lbTable tr.my-score-row td {
+  background: rgba(0, 240, 240, 0.18) !important;
+  color: #00f0f0 !important;
+  font-weight: 800;
+  border-top: 1px solid rgba(0, 240, 240, 0.4);
+  border-bottom: 1px solid rgba(0, 240, 240, 0.4);
+}
+
+.lb-you-tag {
+  background: #00f0f0;
+  color: #000;
+  font-size: 9px;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 4px;
+  margin-left: 6px;
+  letter-spacing: 0.5px;
+}
 
 .no-scores {
   color: var(--muted);
   font-size: 13px;
-  padding: 16px 0;
+  padding: 24px 0;
   text-align: center;
+}
+
+/* ─────────────────────────────────────────────
+   Leaderboard Congratulation Window (Modal)
+───────────────────────────────────────────── */
+.congrats-overlay {
+  z-index: 100005 !important;
+  background: rgba(4, 4, 12, 0.94);
+}
+
+.lb-congrats-modal {
+  max-width: 420px;
+  width: 92vw;
+  background: linear-gradient(180deg, #1b1633 0%, #0d0a1c 100%);
+  border: 2px solid #ffd700;
+  box-shadow: 0 0 35px rgba(255, 215, 0, 0.35), 0 16px 40px rgba(0, 0, 0, 0.9);
+  padding: 24px 20px;
+  gap: 14px;
+  text-align: center;
+  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.congrats-trophy-badge {
+  font-size: 46px;
+  filter: drop-shadow(0 0 16px rgba(255, 215, 0, 0.7));
+  animation: floatBounce 2s ease-in-out infinite;
+}
+
+.lb-congrats-modal h2 {
+  font-size: 24px;
+  letter-spacing: 3px;
+  color: #ffd700;
+  text-shadow: 0 0 16px rgba(255, 215, 0, 0.8);
+  margin: 0;
+}
+
+.congrats-headline {
+  font-size: 13px;
+  color: #e0e0ff;
+  margin: 0;
+}
+
+.congrats-rank-card {
+  width: 100%;
+  padding: 12px;
+  background: rgba(255, 215, 0, 0.08);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+
+.congrats-rank-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #ffd700;
+  font-weight: 700;
+}
+
+.congrats-rank-num {
+  font-size: 38px;
+  font-weight: 900;
+  color: #ffffff;
+  font-family: 'Courier New', monospace;
+  text-shadow: 0 0 18px rgba(0, 240, 240, 0.8);
+  margin: 2px 0;
+}
+
+.congrats-rank-sub {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  color: #00f0f0;
+  font-weight: 700;
+}
+
+.congrats-reward-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: linear-gradient(90deg, rgba(0, 230, 118, 0.15) 0%, rgba(0, 240, 240, 0.15) 100%);
+  border: 1.5px solid #00e676;
+  border-radius: 10px;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.congrats-reward-icon {
+  font-size: 32px;
+}
+
+.congrats-reward-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.congrats-reward-details strong {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #a7f3d0;
+}
+
+.congrats-reward-highlight {
+  font-size: 16px;
+  font-weight: 900;
+  color: #00e676;
+  letter-spacing: 1px;
+}
+
+.congrats-reward-details small {
+  font-size: 10.5px;
+  color: #bbb;
+}
+
+.congrats-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.congrats-revive-btn {
+  background: linear-gradient(180deg, #00e676 0%, #00a844 100%);
+  border-color: #69f0ae;
+  color: #052010;
+  font-size: 14px;
+  font-weight: 900;
+  box-shadow: 0 4px 18px rgba(0, 230, 118, 0.5);
+  animation: pulseNeon 1.5s infinite;
+}
+
+/* Free Revive Button Glow Styling */
+.retro-btn.has-free-revive,
+.revive-overlay-btn.has-free-revive {
+  background: linear-gradient(180deg, #1b5e20 0%, #0d3813 100%) !important;
+  border-color: #00e676 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 16px rgba(0, 230, 118, 0.5) !important;
+  animation: pulseNeon 1.5s infinite;
+}
+
+@keyframes pulseNeon {
+  0%   { transform: scale(1); box-shadow: 0 0 10px rgba(0, 230, 118, 0.4); }
+  50%  { transform: scale(1.02); box-shadow: 0 0 22px rgba(0, 230, 118, 0.8); }
+  100% { transform: scale(1); box-shadow: 0 0 10px rgba(0, 230, 118, 0.4); }
+}
+
+@keyframes floatBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
 }
 
 /* ─────────────────────────────────────────────

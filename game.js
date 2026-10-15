@@ -529,9 +529,9 @@ async function fetchGameToken() {
   }
 }
 
-async function apiFetchScores(limit=10) {
+async function apiFetchScores(limit=500) {
   try {
-    const res = await apiFetch(`/api/scores?limit=${limit}`, {}, 5000);
+    const res = await apiFetch(`/api/scores?limit=${limit}`, {}, 6000);
     const data = await res.json();
     return data.success ? data.scores : [];
   } catch { return []; }
@@ -1321,6 +1321,8 @@ function gameLoop(ts) {
 }
 
 // ── Revive System (10-second window on Game Over) ───────────────────
+const FREE_REVIVES_KEY = 'bd_free_revives';
+let _freeRevivesCount = parseInt(localStorage.getItem(FREE_REVIVES_KEY) || '0', 10);
 let _hasRevivedThisGame = false;
 let _reviveSecondsLeft = 0;
 let _reviveInterval = null;
@@ -1408,25 +1410,127 @@ function updateReviveButtonUI(state) {
     btn.disabled = false;
     btn.classList.add('can-revive');
     btn.classList.remove('is-used', 'is-expired');
-    if (lbl) lbl.textContent = `REVIVE ${_reviveSecondsLeft}s`;
-    btn.title = `Tap to revive! (${_reviveSecondsLeft}s remaining)`;
+    if (_freeRevivesCount > 0) {
+      btn.classList.add('has-free-revive');
+      if (lbl) lbl.textContent = `⚡ FREE (${_freeRevivesCount}·${_reviveSecondsLeft}s)`;
+      btn.title = `Use Free Revive! (${_freeRevivesCount} available, no ad needed)`;
+    } else {
+      btn.classList.remove('has-free-revive');
+      if (lbl) lbl.textContent = `REVIVE ${_reviveSecondsLeft}s`;
+      btn.title = `Tap to revive! (${_reviveSecondsLeft}s remaining)`;
+    }
   } else if (state === 'used') {
     btn.disabled = true;
-    btn.classList.remove('can-revive');
+    btn.classList.remove('can-revive', 'has-free-revive');
     btn.classList.add('is-used');
     if (lbl) lbl.textContent = 'USED';
     btn.title = 'Revive already used this game';
   } else if (state === 'expired') {
     btn.disabled = true;
-    btn.classList.remove('can-revive');
+    btn.classList.remove('can-revive', 'has-free-revive');
     btn.classList.add('is-expired');
     if (lbl) lbl.textContent = 'EXPIRED';
     btn.title = 'Revive window expired';
   } else {
     btn.disabled = true;
-    btn.classList.remove('can-revive', 'is-used', 'is-expired');
-    if (lbl) lbl.textContent = 'REVIVE';
-    btn.title = 'Revive (Available for 10s on Game Over)';
+    btn.classList.remove('can-revive', 'has-free-revive', 'is-used', 'is-expired');
+    if (_freeRevivesCount > 0) {
+      if (lbl) lbl.textContent = `⚡ FREE (${_freeRevivesCount})`;
+      btn.title = `${_freeRevivesCount} Free Revive${_freeRevivesCount > 1 ? 's' : ''} available on Game Over`;
+    } else {
+      if (lbl) lbl.textContent = 'REVIVE';
+      btn.title = 'Revive (Available for 10s on Game Over)';
+    }
+  }
+}
+
+function useFreeRevive() {
+  if (_hasRevivedThisGame) return;
+  if (_freeRevivesCount <= 0) {
+    AdMobManager.requestReviveWithAd();
+    return;
+  }
+  _freeRevivesCount--;
+  try { localStorage.setItem(FREE_REVIVES_KEY, _freeRevivesCount); } catch(_) {}
+  AdMobManager.showNotice('⚡ FREE REVIVE USED!', 'SAVED BY YOUR LEADERBOARD REWARD');
+  triggerRevive(true);
+}
+
+function handleReviveClick() {
+  if (_hasRevivedThisGame || _reviveSecondsLeft <= 0) return;
+  if (_freeRevivesCount > 0) {
+    useFreeRevive();
+  } else {
+    AdMobManager.requestReviveWithAd();
+  }
+}
+
+function awardFreeRevive(rank, finalScore) {
+  _freeRevivesCount = Math.max(0, _freeRevivesCount + 1);
+  try { localStorage.setItem(FREE_REVIVES_KEY, _freeRevivesCount); } catch (_) {}
+
+  // Update Game Over revive button if visible
+  const overlayBtn = document.getElementById('overlayReviveBtn');
+  if (overlayBtn && !_hasRevivedThisGame && _reviveSecondsLeft > 0) {
+    overlayBtn.classList.add('has-free-revive');
+    overlayBtn.innerHTML = `⚡ FREE REVIVE (${_freeRevivesCount} Left · <span id="overlayReviveTimer">${_reviveSecondsLeft}</span>s)`;
+  }
+  updateReviveButtonUI(_reviveSecondsLeft > 0 ? 'active' : 'idle');
+
+  showLeaderboardCongrats(rank, finalScore);
+}
+
+function showLeaderboardCongrats(rank, finalScore) {
+  const modal = document.getElementById('lbCongratsModal');
+  if (!modal) return;
+
+  // Pause countdown while player views congrats window
+  if (_reviveInterval) {
+    clearInterval(_reviveInterval);
+    _reviveInterval = null;
+  }
+
+  const rankNumEl = document.getElementById('congratsRankNum');
+  const rankSubEl = document.getElementById('congratsRankSub');
+  const balanceEl = document.getElementById('congratsBalanceText');
+  const useBtn    = document.getElementById('congratsUseReviveBtn');
+
+  if (rankNumEl) rankNumEl.textContent = `#${rank}`;
+  if (rankSubEl) {
+    if (rank === 1) rankSubEl.textContent = '👑 #1 WORLD CHAMPION!';
+    else if (rank <= 10) rankSubEl.textContent = '🥇 TOP 10 WORLDWIDE!';
+    else if (rank <= 50) rankSubEl.textContent = '⭐ TOP 50 WORLDWIDE!';
+    else if (rank <= 100) rankSubEl.textContent = '🔥 TOP 100 WORLDWIDE!';
+    else rankSubEl.textContent = 'TOP 500 WORLDWIDE!';
+  }
+
+  if (balanceEl) {
+    balanceEl.textContent = `You now have ${_freeRevivesCount} Free Revive${_freeRevivesCount > 1 ? 's' : ''} banked! Use without ads.`;
+  }
+
+  if (useBtn) {
+    if (!_hasRevivedThisGame && _reviveSecondsLeft > 0) {
+      useBtn.style.display = 'block';
+      useBtn.textContent = `⚡ USE FREE REVIVE NOW! (${_reviveSecondsLeft}s left)`;
+    } else {
+      useBtn.style.display = 'none';
+    }
+  }
+
+  modal.style.display = 'flex';
+  modal.style.zIndex = '100002';
+
+  try {
+    if (typeof SFX !== 'undefined' && SFX.blockDrop) SFX.blockDrop();
+    if (typeof HAP !== 'undefined' && HAP.blockDrop) HAP.blockDrop();
+  } catch(_) {}
+}
+
+function closeCongratsModal(resumeTimer = true) {
+  const modal = document.getElementById('lbCongratsModal');
+  if (modal) modal.style.display = 'none';
+  if (resumeTimer && !_hasRevivedThisGame && _reviveSecondsLeft > 0) {
+    resumeReviveCountdown();
   }
 }
 
@@ -1864,11 +1968,11 @@ async function openLB() {
   const modal=document.getElementById('lbModal');
   if (!modal) return;
   const tbody=document.getElementById('lbBody');
-  if (tbody) tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:#888;padding:16px">Loading…</td></tr>`;
+  if (tbody) tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:#888;padding:16px">Loading Top 500…</td></tr>`;
   modal.style.display='flex';
   modal.style.zIndex='100000';
   try {
-    const scores=await apiFetchScores(10);
+    const scores=await apiFetchScores(500);
     renderLBRows(scores);
   } catch(err) {
     console.error('LB fetch error:', err);
@@ -1878,25 +1982,63 @@ async function openLB() {
 
 function renderLBRows(scores) {
   const tbody=document.getElementById('lbBody');
-  if(!scores.length){
+  const banner=document.getElementById('lbPlayerRankBanner');
+  if (!tbody) return;
+
+  if (!scores || !scores.length) {
     tbody.innerHTML=`<tr><td colspan="5" class="no-scores">No scores yet — play to get on the board!</td></tr>`;
+    if (banner) banner.style.display = 'none';
     return;
   }
+
   const medals=['🥇','🥈','🥉'];
-  tbody.innerHTML=scores.map((e,i)=>`
-    <tr>
-      <td>${medals[i]||i+1}</td>
-      <td>
-        <div class="lb-name-cell">
-          ${e.country_flag ? `<span class="lb-flag">${escHtml(e.country_flag)}</span>` : ''}
-          <span>${escHtml(e.name)}</span>
-        </div>
-      </td>
-      <td><strong>${Number(e.score).toLocaleString()}</strong></td>
-      <td>${e.level}</td>
-      <td>${e.lines}</td>
-    </tr>
-  `).join('');
+  let playerFoundRank = null;
+  const currentFp = _playerFp;
+  const currentName = (_playerName || '').trim().toLowerCase();
+
+  const rowsHtml = scores.map((e, i) => {
+    const rankNum = i + 1;
+    const isMe = (currentFp && e.player_fp && e.player_fp === currentFp) ||
+                 (e.name && e.name.trim().toLowerCase() === currentName && currentName !== 'player');
+
+    if (isMe && playerFoundRank === null) {
+      playerFoundRank = rankNum;
+    }
+
+    const rowClass = isMe ? ' class="my-score-row"' : '';
+    const youTag = isMe ? ' <span class="lb-you-tag">YOU</span>' : '';
+
+    return `
+      <tr${rowClass}>
+        <td>${medals[i] || rankNum}</td>
+        <td>
+          <div class="lb-name-cell">
+            ${e.country_flag ? `<span class="lb-flag">${escHtml(e.country_flag)}</span>` : ''}
+            <span>${escHtml(e.name)}</span>${youTag}
+          </div>
+        </td>
+        <td><strong>${Number(e.score).toLocaleString()}</strong></td>
+        <td>${e.level}</td>
+        <td>${e.lines}</td>
+      </tr>
+    `;
+  }).join('');
+
+  tbody.innerHTML = rowsHtml;
+
+  if (banner) {
+    if (playerFoundRank !== null) {
+      const lpbName = document.getElementById('lpbName');
+      const lpbRank = document.getElementById('lpbRank');
+      const lpbReward = document.getElementById('lpbRewardBadge');
+      if (lpbName) lpbName.textContent = _playerName || 'Pilot';
+      if (lpbRank) lpbRank.textContent = `#${playerFoundRank}`;
+      if (lpbReward) lpbReward.textContent = `⚡ ${_freeRevivesCount > 0 ? _freeRevivesCount + ' Free Revive' + (_freeRevivesCount > 1 ? 's' : '') : '1 Free Revive'}`;
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
 }
 
 function escHtml(str) {
@@ -1926,6 +2068,11 @@ async function autoSaveScore() {
   if (result.bestScore) _personalBest = Math.max(_personalBest, result.bestScore);
   else _personalBest = Math.max(_personalBest, score);
   showGameOverOverlay(result.rank || null, result.bestScore || _personalBest);
+
+  // If internet is connected and score places on Top 500 Leaderboard, award Free Revive & congratulate!
+  if (result.success && result.rank && result.rank <= 500) {
+    awardFreeRevive(result.rank, score);
+  }
 }
 
 // ── Name entry (fallback only — for players with no saved name) ────────
@@ -1954,6 +2101,10 @@ async function saveScore() {
   if (result.bestScore) _personalBest = Math.max(_personalBest, result.bestScore);
   else _personalBest = Math.max(_personalBest, score);
   showGameOverOverlay(result.rank || null, result.bestScore || _personalBest);
+
+  if (result.success && result.rank && result.rank <= 500) {
+    awardFreeRevive(result.rank, score);
+  }
 }
 
 function skipScore() {
@@ -1970,7 +2121,9 @@ function showGameOverOverlay(rank, bestScore) {
   const rankMsg=rank?`<p>You ranked <strong>#${rank}</strong> on the leaderboard!</p>`:'';
 
   const reviveBtnHtml = (!_hasRevivedThisGame && _reviveSecondsLeft > 0)
-    ? `<button class="retro-btn revive-overlay-btn" id="overlayReviveBtn">⚡ REVIVE (<span id="overlayReviveTimer">${_reviveSecondsLeft}</span>s)</button>`
+    ? (_freeRevivesCount > 0
+        ? `<button class="retro-btn revive-overlay-btn has-free-revive" id="overlayReviveBtn">⚡ FREE REVIVE (${_freeRevivesCount} Left · <span id="overlayReviveTimer">${_reviveSecondsLeft}</span>s)</button>`
+        : `<button class="retro-btn revive-overlay-btn" id="overlayReviveBtn">⚡ REVIVE (<span id="overlayReviveTimer">${_reviveSecondsLeft}</span>s)</button>`)
     : '';
 
   showOverlay(`
@@ -1984,7 +2137,7 @@ function showGameOverOverlay(rank, bestScore) {
     <button class="retro-btn secondary" id="goLbBtn">🏆 Leaderboard</button>
     <button class="retro-btn secondary" id="goMenuBtn">🏠 Return to Menu</button>
   `);
-  document.getElementById('overlayReviveBtn')?.addEventListener('click', () => AdMobManager.requestReviveWithAd());
+  document.getElementById('overlayReviveBtn')?.addEventListener('click', handleReviveClick);
   document.getElementById('restartBtn').addEventListener('click', startGame);
   document.getElementById('goLbBtn').addEventListener('click', openLB);
   document.getElementById('goMenuBtn').addEventListener('click', returnToMenu);
@@ -2232,6 +2385,32 @@ document.getElementById('settingsNameInput')?.addEventListener('keydown',e=>{ if
 
 // Global event delegation guaranteeing all modal open/close actions fire
 document.addEventListener('click', (e) => {
+  const reviveClick = e.target.closest('#overlayReviveBtn, #reviveBtn');
+  if (reviveClick) {
+    e.preventDefault();
+    handleReviveClick();
+    return;
+  }
+  const congratsUse = e.target.closest('#congratsUseReviveBtn');
+  if (congratsUse) {
+    e.preventDefault();
+    closeCongratsModal(false);
+    useFreeRevive();
+    return;
+  }
+  const congratsClaim = e.target.closest('#congratsClaimBtn');
+  if (congratsClaim) {
+    e.preventDefault();
+    closeCongratsModal(true);
+    return;
+  }
+  const congratsViewLb = e.target.closest('#congratsViewLbBtn');
+  if (congratsViewLb) {
+    e.preventDefault();
+    closeCongratsModal(false);
+    openLB();
+    return;
+  }
   const lbBtn = e.target.closest('#overlayLbBtn, #menuNavLb, #leaderboardBtn, #leaderboardBtn2, #goLbBtn');
   if (lbBtn) {
     e.preventDefault();
@@ -2280,6 +2459,10 @@ document.addEventListener('click', (e) => {
     saveSettingsName();
     return;
   }
+  if (e.target.id === 'lbCongratsModal') {
+    closeCongratsModal(true);
+    return;
+  }
   if (e.target.id === 'lbModal') {
     closeLB();
     return;
@@ -2293,6 +2476,8 @@ document.addEventListener('click', (e) => {
 // Escape key to dismiss modals
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    const cg = document.getElementById('lbCongratsModal');
+    if (cg && cg.style.display !== 'none') { closeCongratsModal(true); return; }
     const lb = document.getElementById('lbModal');
     if (lb && lb.style.display !== 'none') { closeLB(); return; }
     const st = document.getElementById('settingsModal');
@@ -2487,7 +2672,7 @@ window.endGame = function endGame(){
 (function init(){
   loadSavedCountry();
   loadPlayerProfile(); // non-blocking background sync with offline cache
-  document.getElementById('reviveBtn')?.addEventListener('click', () => AdMobManager.requestReviveWithAd());
+  document.getElementById('reviveBtn')?.addEventListener('click', handleReviveClick);
   AdMobManager.init();
 })();
 

@@ -247,7 +247,7 @@ app.get('/api/game-token', (_req, res) => {
 
 app.get('/api/scores', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 10, 100);
+    const limit = Math.min(parseInt(req.query.limit) || 500, 500);
     const { rows } = await query(
       `SELECT * FROM (
          SELECT DISTINCT ON (COALESCE(s.player_fp, LOWER(s.name)))
