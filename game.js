@@ -1748,9 +1748,14 @@ const AdMobManager = {
       this.adPlugin.addListener('onBannerAdLoaded', () => {
         console.log('[AdMob] Banner loaded successfully');
         this.isBannerShowing = true;
+        document.body.classList.add('has-banner-ad');
+        document.documentElement.style.setProperty('--banner-height', '52px');
       });
       this.adPlugin.addListener('onBannerAdFailedToLoad', (err) => {
         console.warn('[AdMob] Banner failed to load:', err);
+        this.isBannerShowing = false;
+        document.body.classList.remove('has-banner-ad');
+        document.documentElement.style.setProperty('--banner-height', '0px');
       });
 
       // Auto-trigger pending interstitial when internet is restored
@@ -1908,6 +1913,10 @@ const AdMobManager = {
     if (typeof gameRunning !== 'undefined' && gameRunning) return;
     if (this.isBannerShowing) return;
 
+    // Immediately allocate space so menu bar sits cleanly above the banner
+    document.body.classList.add('has-banner-ad');
+    document.documentElement.style.setProperty('--banner-height', '52px');
+
     // 1. Try production banner ID if provided
     const prodBanner = (this.bannerAdId && !this.bannerAdId.includes('YOUR_')) ? this.bannerAdId : null;
     if (prodBanner) {
@@ -1940,14 +1949,19 @@ const AdMobManager = {
       this.isBannerShowing = true;
     } catch (err2) {
       console.warn('[AdMob] Test banner show failed:', err2?.message || err2);
+      this.isBannerShowing = false;
+      document.body.classList.remove('has-banner-ad');
+      document.documentElement.style.setProperty('--banner-height', '0px');
     }
   },
 
   async hideBannerForGame() {
+    this.isBannerShowing = false;
+    document.body.classList.remove('has-banner-ad');
+    document.documentElement.style.setProperty('--banner-height', '0px');
     if (!this.adPlugin) return;
     try {
       await this.adPlugin.hideBanner();
-      this.isBannerShowing = false;
       console.log('[AdMob] Banner hidden for active gameplay');
     } catch (_) {}
   },

@@ -4,6 +4,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 :root {
+  --banner-height: 0px;
   --bg:        #0d0d1a;
   --panel-bg:  #1a1a2e;
   --border:    #333;
@@ -126,15 +127,25 @@ body.in-menu .right-panel {
 body.in-menu .game-wrapper {
   height: 100vh;
   align-items: center;
-  padding: 0 0 60px 0 !important;
+  padding: 0 0 calc(62px + var(--banner-height, 0px)) 0 !important;
   box-sizing: border-box;
+  transition: padding-bottom 0.2s ease;
+}
+
+body.in-menu.has-banner-ad .game-wrapper {
+  padding: 0 0 118px 0 !important;
 }
 
 body.in-menu #gameCanvas {
   width: 92vw !important;
   max-width: 340px !important;
-  max-height: calc(92vh - 65px) !important;
+  max-height: calc(92vh - 65px - var(--banner-height, 0px)) !important;
   aspect-ratio: 1 / 2.16 !important;
+  transition: max-height 0.2s ease;
+}
+
+body.in-menu.has-banner-ad #gameCanvas {
+  max-height: calc(88vh - 120px) !important;
 }
 
 .stat-pill {
@@ -857,9 +868,24 @@ body.in-menu #gameCanvas {
   max-width: 520px;
   width: 95vw;
   max-height: 82vh;
-  margin-bottom: 54px;
+  margin-bottom: calc(10px + var(--banner-height, 0px));
   padding: 20px 16px;
   gap: 10px;
+}
+
+body.has-banner-ad .lb-modal-top500,
+body.has-banner-ad .settings-modal {
+  margin-bottom: 58px;
+  max-height: 80vh;
+}
+
+body.has-banner-ad .htp-modal {
+  padding-bottom: 58px !important;
+  max-height: 80vh;
+}
+
+body.has-banner-ad #overlay {
+  padding-bottom: 54px;
 }
 
 .lb-top500-sub {
@@ -4195,7 +4221,7 @@ body.theme-nano-banana .modal h2 {
 /* ── Nano Banana Menu Bottom Bar ── */
 .menu-bottom-bar {
   position: fixed;
-  bottom: 0;
+  bottom: var(--banner-height, 0px);
   left: 0;
   right: 0;
   height: 56px;
@@ -4208,6 +4234,11 @@ body.theme-nano-banana .modal h2 {
   z-index: 999;
   padding: 0 12px;
   box-sizing: border-box;
+  transition: bottom 0.2s ease;
+}
+
+body.has-banner-ad .menu-bottom-bar {
+  bottom: 52px !important;
 }
 
 body.in-menu .menu-bottom-bar {
