@@ -1502,7 +1502,7 @@ const AdMobManager = {
   _isLoadingRewarded: false,
 
   // App Open Ad Unit IDs
-  appOpenAdId: 'ca-app-pub-8122097857797560/YOUR_APP_OPEN_ID',
+  appOpenAdId: 'ca-app-pub-8122097857797560/8257754141',
   testAppOpenAdId: 'ca-app-pub-3940256099942544/9257390308',
   isAppOpenPrepared: false,
   _isLoadingAppOpen: false,
