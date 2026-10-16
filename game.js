@@ -1501,6 +1501,16 @@ const AdMobManager = {
   _isLoadingInterstitial: false,
   _isLoadingRewarded: false,
 
+  // App Open Ad Unit IDs
+  appOpenAdId: 'ca-app-pub-8122097857797560/YOUR_APP_OPEN_ID',
+  testAppOpenAdId: 'ca-app-pub-3940256099942544/9257390308',
+  isAppOpenPrepared: false,
+  _isLoadingAppOpen: false,
+  _isShowingAppOpen: false,
+  _onAppOpenClosed: null,
+  _lastAppOpenShownTs: 0,
+  _appOpenColdStartShown: false,
+
   isInitialized: false,
   isPrepared: false,
   activeAdUnitId: null,
@@ -1551,6 +1561,9 @@ const AdMobManager = {
       }
       if (!this.isPrepared && !this._isLoadingRewarded) {
         this.preloadRewarded();
+      }
+      if (!this.isAppOpenPrepared && !this._isLoadingAppOpen) {
+        this.preloadAppOpen();
       }
       if (!this.isBannerShowing && (typeof gameRunning === 'undefined' || !gameRunning || paused)) {
         this.showMenuBanner();
@@ -1652,6 +1665,7 @@ const AdMobManager = {
         this.setupListeners();
         this.preloadRewarded();
         this.preloadInterstitial();
+        this.preloadAppOpen();
 
         // Show bottom adaptive banner on menu if game is not currently running
         if (typeof gameRunning === 'undefined' || !gameRunning) {
@@ -1783,6 +1797,58 @@ const AdMobManager = {
       this.adPlugin.addListener('bannerAdFailedToLoad', handleBannerFailed);
       this.adPlugin.addListener('onBannerAdFailedToLoad', handleBannerFailed);
 
+      // App Open Ad Listeners (binding both standard and on-prefixed event names)
+      const handleAppOpenLoaded = () => {
+        console.log('[AdMob] App Open ad loaded & ready');
+        this.isAppOpenPrepared = true;
+        // On cold launch: show once if player is still in menu
+        if (!this._appOpenColdStartShown && (typeof gameRunning === 'undefined' || !gameRunning)) {
+          this._appOpenColdStartShown = true;
+          setTimeout(() => {
+            if (typeof gameRunning === 'undefined' || !gameRunning) {
+              this.showAppOpenAd();
+            }
+          }, 600);
+        }
+      };
+      this.adPlugin.addListener('appOpenAdLoaded', handleAppOpenLoaded);
+      this.adPlugin.addListener('onAppOpenAdLoaded', handleAppOpenLoaded);
+
+      const handleAppOpenClosed = () => {
+        console.log('[AdMob] App Open ad closed');
+        this.isAppOpenPrepared = false;
+        this._isShowingAppOpen = false;
+        if (typeof this._onAppOpenClosed === 'function') {
+          const cb = this._onAppOpenClosed;
+          this._onAppOpenClosed = null;
+          cb();
+        }
+        this.preloadAppOpen();
+      };
+      this.adPlugin.addListener('appOpenAdClosed', handleAppOpenClosed);
+      this.adPlugin.addListener('onAppOpenAdClosed', handleAppOpenClosed);
+
+      const handleAppOpenFailedToLoad = (err) => {
+        console.warn('[AdMob] App Open ad failed to load:', err);
+        this.isAppOpenPrepared = false;
+      };
+      this.adPlugin.addListener('appOpenAdFailedToLoad', handleAppOpenFailedToLoad);
+      this.adPlugin.addListener('onAppOpenAdFailedToLoad', handleAppOpenFailedToLoad);
+
+      const handleAppOpenFailedToShow = (err) => {
+        console.warn('[AdMob] App Open ad failed to show:', err);
+        this.isAppOpenPrepared = false;
+        this._isShowingAppOpen = false;
+        if (typeof this._onAppOpenClosed === 'function') {
+          const cb = this._onAppOpenClosed;
+          this._onAppOpenClosed = null;
+          cb();
+        }
+        this.preloadAppOpen();
+      };
+      this.adPlugin.addListener('appOpenAdFailedToShow', handleAppOpenFailedToShow);
+      this.adPlugin.addListener('onAppOpenAdFailedToShow', handleAppOpenFailedToShow);
+
       // Auto-trigger pending interstitial when internet is restored
       window.addEventListener('online', () => {
         console.log('[AdMob] Network restored (online event)');
@@ -1880,6 +1946,41 @@ const AdMobManager = {
     }
   },
 
+  async preloadAppOpen() {
+    if (!this.adPlugin || !this.isInitialized) return;
+    if (this.isAppOpenPrepared || this._isLoadingAppOpen) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+
+    this._isLoadingAppOpen = true;
+    try {
+      // 1. Try production App Open ad unit ID if provided
+      if (this.appOpenAdId && !this.appOpenAdId.includes('YOUR_')) {
+        try {
+          console.log('[AdMob] Preloading production App Open ad:', this.appOpenAdId);
+          await this.adPlugin.loadAppOpen({ adId: this.appOpenAdId });
+          this.isAppOpenPrepared = true;
+          console.log('[AdMob] Production App Open ad loaded & ready');
+          return;
+        } catch (err) {
+          console.warn('[AdMob] Production App Open prepare failed, trying test fallback:', err?.message || err);
+        }
+      }
+
+      // 2. Test App Open ad fallback
+      try {
+        console.log('[AdMob] Preloading test App Open ad:', this.testAppOpenAdId);
+        await this.adPlugin.loadAppOpen({ adId: this.testAppOpenAdId });
+        this.isAppOpenPrepared = true;
+        console.log('[AdMob] Test App Open ad loaded & ready');
+      } catch (err2) {
+        console.warn('[AdMob] Test App Open prepare failed:', err2?.message || err2);
+        this.isAppOpenPrepared = false;
+      }
+    } finally {
+      this._isLoadingAppOpen = false;
+    }
+  },
+
   async showPreparedOrLoad() {
     if (!this.adPlugin) throw new Error('No AdMob plugin');
 
@@ -1972,6 +2073,74 @@ const AdMobManager = {
         this._onInterstitialClosed = null;
         cb();
       }
+    }
+  },
+
+  async showAppOpenAd(onClosed) {
+    if (!this.adPlugin || !this.isInitialized) {
+      if (onClosed) onClosed();
+      return;
+    }
+
+    const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
+    if (!isOnline) {
+      if (onClosed) onClosed();
+      return;
+    }
+
+    // Strict safety: NEVER show App Open ad during active gameplay!
+    if (typeof gameRunning !== 'undefined' && gameRunning && !paused) {
+      console.log('[AdMob] Active gameplay running, skipping App Open ad');
+      if (onClosed) onClosed();
+      return;
+    }
+
+    if (this._isShowingAppOpen) {
+      return;
+    }
+
+    if (!this.isAppOpenPrepared) {
+      await this.preloadAppOpen();
+    }
+
+    if (!this.isAppOpenPrepared) {
+      if (onClosed) onClosed();
+      return;
+    }
+
+    this._isShowingAppOpen = true;
+    this._lastAppOpenShownTs = Date.now();
+    this._onAppOpenClosed = onClosed;
+
+    try {
+      await this.adPlugin.showAppOpen();
+    } catch (err) {
+      console.warn('[AdMob] showAppOpen failed:', err);
+      this.isAppOpenPrepared = false;
+      this._isShowingAppOpen = false;
+      if (typeof this._onAppOpenClosed === 'function') {
+        const cb = this._onAppOpenClosed;
+        this._onAppOpenClosed = null;
+        cb();
+      }
+    }
+  },
+
+  handleAppResumeOpenAd() {
+    const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
+    if (!isOnline) return;
+    if (typeof gameRunning !== 'undefined' && gameRunning && !paused) return;
+    if (this._isShowingAppOpen || this._isShowingPendingAd || this.pendingAction) return;
+
+    // Minimum 4 minutes cooldown between app resume open ads to respect AdMob policy
+    const COOLDOWN_MS = 4 * 60 * 1000;
+    if (Date.now() - this._lastAppOpenShownTs < COOLDOWN_MS) return;
+
+    if (this.isAppOpenPrepared) {
+      console.log('[AdMob] App resumed in menu, presenting prepared App Open ad...');
+      this.showAppOpenAd();
+    } else {
+      this.preloadAppOpen();
     }
   },
 
@@ -3127,6 +3296,8 @@ function handleAppResume() {
     if (typeof _musicOn !== 'undefined' && _musicOn && !_muted && typeof startMusic === 'function') {
       startMusic();
     }
+  } else if (typeof AdMobManager !== 'undefined') {
+    AdMobManager.handleAppResumeOpenAd();
   }
 }
 document.addEventListener('visibilitychange', () => {
