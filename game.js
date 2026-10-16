@@ -1513,9 +1513,23 @@ const AdMobManager = {
     return localStorage.getItem(PENDING_INTERSTITIAL_KEY) === 'true';
   },
 
+  getStoredMatchesCount() {
+    return parseInt(localStorage.getItem(INTERSTITIAL_COUNT_KEY) || '0', 10);
+  },
+
+  isAdDue() {
+    return this.hasPendingInterstitial() || this.getStoredMatchesCount() >= 4;
+  },
+
+  resetMatchesCount() {
+    localStorage.setItem(INTERSTITIAL_COUNT_KEY, '0');
+    localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+    console.log('[AdMob] Matches count reset to 0 in local storage for next session.');
+  },
+
   _handleInterstitialDismissed() {
     console.log('[AdMob] Interstitial dismissed. User completed ad session.');
-    localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+    this.resetMatchesCount();
     this.isInterstitialPrepared = false;
     this._isShowingPendingAd = false;
     this.preloadInterstitial();
@@ -1543,7 +1557,7 @@ const AdMobManager = {
       }
     }
 
-    if (!this.hasPendingInterstitial()) return;
+    if (!this.isAdDue()) return;
     if (this._isShowingPendingAd) return;
 
     // If game has started / is active and internet turned on:
@@ -1594,6 +1608,7 @@ const AdMobManager = {
       this.showInterstitialAd(() => {
         clearTimeout(safetyResumeTimer);
         this._isShowingPendingAd = false;
+        this.resetMatchesCount();
         if (wasPlaying && typeof gameRunning !== 'undefined' && gameRunning) {
           paused = false;
           if (typeof lastDrop !== 'undefined') lastDrop = performance.now();
@@ -1739,7 +1754,7 @@ const AdMobManager = {
         console.warn('[AdMob] Interstitial failed to show event:', err);
         this.isInterstitialPrepared = false;
         this._isShowingPendingAd = false;
-        localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+        this.resetMatchesCount();
         if (typeof this._onInterstitialClosed === 'function') {
           const cb = this._onInterstitialClosed;
           this._onInterstitialClosed = null;
@@ -1883,7 +1898,7 @@ const AdMobManager = {
   async showInterstitialAd(onClosed) {
     if (!this.adPlugin || !this.isInitialized) {
       console.log('[AdMob] In web browser testing: simulated interstitial completed');
-      localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+      this.resetMatchesCount();
       this._isShowingPendingAd = false;
       if (onClosed) onClosed();
       return;
@@ -1911,7 +1926,7 @@ const AdMobManager = {
 
     if (!this.isInterstitialPrepared) {
       console.warn('[AdMob] Interstitial ad not ready; continuing without blocking player');
-      localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+      this.resetMatchesCount();
       this._isShowingPendingAd = false;
       if (typeof this._onInterstitialClosed === 'function') {
         const cb = this._onInterstitialClosed;
@@ -1949,7 +1964,7 @@ const AdMobManager = {
       console.warn('[AdMob] Interstitial show failed:', err);
       this.isInterstitialPrepared = false;
       this._isShowingPendingAd = false;
-      localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+      this.resetMatchesCount();
       window.removeEventListener('focus', focusCleanup);
       document.removeEventListener('visibilitychange', visCleanup);
       if (typeof this._onInterstitialClosed === 'function') {
@@ -2204,86 +2219,75 @@ function fxReviveClear(topRows) {
 
 // ── Interstitial Triggers & Frequency Capping ────────────────────────
 function shouldTriggerGameOverInterstitial() {
-  const gCount = parseInt(localStorage.getItem(INTERSTITIAL_COUNT_KEY) || '0', 10);
-  return gCount >= 4; // Triggers automatically every 4th or 5th game
+  return AdMobManager.isAdDue();
 }
 
 function handlePlayAgainClick() {
   const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
 
-  if (AdMobManager.hasPendingInterstitial()) {
+  if (AdMobManager.isAdDue()) {
     if (isOnline) {
       AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
       AdMobManager.showInterstitialAd(() => {
+        AdMobManager.resetMatchesCount();
         startGame();
       });
       return;
     } else {
-      // Offline: do not show alert '⚠️ NO INTERNET: CONNECT TO INTERNET TO PLAY'
-      // Allow playing locally; pending flag remains stored and will trigger when online
-      console.log('[AdMob] Offline: bypassing pending block for local play, ad will trigger when online');
+      // Offline: do not show alert. Allow playing locally; matches will accumulate locally
+      console.log('[AdMob] Offline: playing locally without ad, matches will accumulate');
       startGame();
       return;
     }
   }
 
-  // Interstitial triggers every 4th/5th game — not skipped even if player used a revive
-  if (shouldTriggerGameOverInterstitial()) {
-    localStorage.setItem(INTERSTITIAL_COUNT_KEY, '0');
-    if (isOnline) {
-      AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
-      AdMobManager.showInterstitialAd(() => {
-        startGame();
-      });
-    } else {
-      // Offline: store pending flag for when internet connects, and start local game immediately
-      localStorage.setItem(PENDING_INTERSTITIAL_KEY, 'true');
-      startGame();
-    }
-  } else {
-    startGame();
-  }
+  startGame();
 }
 
 function handleGoMenuClick() {
   const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
 
-  // Interstitial triggers every 4th/5th game — not skipped even if player used a revive
-  if (shouldTriggerGameOverInterstitial()) {
-    localStorage.setItem(INTERSTITIAL_COUNT_KEY, '0');
+  if (AdMobManager.isAdDue()) {
     if (isOnline) {
       AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
       AdMobManager.showInterstitialAd(() => {
+        AdMobManager.resetMatchesCount();
         returnToMenu();
       });
+      return;
     } else {
-      // Offline: store pending flag for when internet connects
-      localStorage.setItem(PENDING_INTERSTITIAL_KEY, 'true');
+      // Offline: allow returning to menu, matches remain stored locally
       returnToMenu();
+      return;
     }
-  } else {
-    returnToMenu();
   }
+
+  returnToMenu();
 }
 
 // ── Game flow ──────────────────────────────────
 async function startGame() {
   const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
 
-  // Check if player has a pending interstitial from previously closing the app
-  if (AdMobManager.hasPendingInterstitial()) {
+  // Check if player has an ad due (pending ad or accumulated games >= 4)
+  if (AdMobManager.isAdDue()) {
     if (isOnline) {
       AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
       AdMobManager.showInterstitialAd(() => {
+        AdMobManager.resetMatchesCount();
         startGame();
       });
       return;
     } else {
-      // Offline: do not show alerts '⚠️ NO INTERNET: CONNECT TO INTERNET TO PLAY'
-      // Allow local gameplay, keep pending flag active so ad shows when internet is on
-      console.log('[AdMob] Offline: starting local game with pending interstitial flag active');
+      // Offline: do not show alerts. Allow local gameplay immediately!
+      console.log('[AdMob] Offline: starting local game; matches will accumulate locally');
     }
   }
+
+  // Record this match locally in localStorage
+  const currentMatches = AdMobManager.getStoredMatchesCount() + 1;
+  localStorage.setItem(INTERSTITIAL_COUNT_KEY, currentMatches.toString());
+  console.log(`[AdMob] Started match #${currentMatches} (stored locally)`);
 
   // Hide banner during active gameplay
   AdMobManager.hideBannerForGame();
@@ -2311,10 +2315,7 @@ function endGame() {
   startReviveCountdown();
   syncControlButtons();
 
-  // Increment games count for interstitial frequency cap (every 4th/5th game)
-  const gCount = parseInt(localStorage.getItem(INTERSTITIAL_COUNT_KEY) || '0', 10) + 1;
-  localStorage.setItem(INTERSTITIAL_COUNT_KEY, gCount);
-  console.log(`[AdMob] Games played since last interstitial: ${gCount}`);
+  console.log(`[AdMob] Game ended. Total matches currently stored: ${AdMobManager.getStoredMatchesCount()}`);
 
   // Score is auto-saved with the player's saved name — no name prompt needed
   autoSaveScore();
