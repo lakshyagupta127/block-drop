@@ -1478,6 +1478,7 @@ function closeCongratsModal(resumeTimer = true) {
 // ── Interstitial & Ad Persistence Keys ──────────────
 const INTERSTITIAL_COUNT_KEY = 'bd_games_since_interstitial';
 const PENDING_INTERSTITIAL_KEY = 'bd_pending_interstitial';
+const INTERSTITIAL_GAME_INTERVAL = 7; // Triggers interstitial every 7 games
 
 // ── Google AdMob Controller ──
 const AdMobManager = {
@@ -1528,7 +1529,7 @@ const AdMobManager = {
   },
 
   isAdDue() {
-    return this.hasPendingInterstitial() || this.getStoredMatchesCount() >= 4;
+    return this.hasPendingInterstitial() || this.getStoredMatchesCount() >= INTERSTITIAL_GAME_INTERVAL;
   },
 
   resetMatchesCount() {
@@ -1638,9 +1639,9 @@ const AdMobManager = {
 
   async init() {
     try {
-      // Auto-heal any stuck pending flag from prior versions if user hasn't completed 4 games
+      // Auto-heal any stuck pending flag from prior versions if user hasn't completed required games
       const currentGCount = parseInt(localStorage.getItem(INTERSTITIAL_COUNT_KEY) || '0', 10);
-      if (currentGCount < 4) {
+      if (currentGCount < INTERSTITIAL_GAME_INTERVAL) {
         localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
       }
       localStorage.removeItem('bd_free_revives');
