@@ -1492,7 +1492,7 @@ const AdMobManager = {
   isBannerShowing: false,
 
   // Full-Screen Interstitial Ad Unit IDs
-  interstitialAdId: 'ca-app-pub-8122097857797560/YOUR_INTERSTITIAL_ID',
+  interstitialAdId: 'ca-app-pub-8122097857797560/8829600946',
   testInterstitialAdId: 'ca-app-pub-3940256099942544/1033173712',
   isInterstitialPrepared: false,
   _onInterstitialClosed: null,
