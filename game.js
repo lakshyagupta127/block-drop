@@ -1558,6 +1558,8 @@ const AdMobManager = {
   _onInterstitialClosed: null,
   _isShowingPendingAd: false,
   _networkInterval: null,
+  _isLoadingInterstitial: false,
+  _isLoadingRewarded: false,
 
   isInitialized: false,
   isPrepared: false,
@@ -1588,10 +1590,14 @@ const AdMobManager = {
     const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
     if (!isOnline) return;
 
-    // Ensure ad units are preloaded in background once online
+    // Ensure ad units are preloaded in background once online safely without duplicate calls
     if (this.adPlugin && this.isInitialized) {
-      if (!this.isInterstitialPrepared) this.preloadInterstitial();
-      if (!this.isPrepared) this.preloadRewarded();
+      if (!this.isInterstitialPrepared && !this._isLoadingInterstitial) {
+        this.preloadInterstitial();
+      }
+      if (!this.isPrepared && !this._isLoadingRewarded) {
+        this.preloadRewarded();
+      }
       if (!this.isBannerShowing && (typeof gameRunning === 'undefined' || !gameRunning || paused)) {
         this.showMenuBanner();
       }
@@ -1600,10 +1606,23 @@ const AdMobManager = {
     if (!this.hasPendingInterstitial()) return;
     if (this._isShowingPendingAd) return;
 
-    // If game has started / is active and internet turned on: automatically show the ad!
+    // If game has started / is active and internet turned on:
+    // Only present the ad once it has fully downloaded in background AND app is visible in foreground!
+    // NEVER freeze or pause active gameplay while an ad is downloading!
     if (typeof gameRunning !== 'undefined' && gameRunning) {
+      if (!this.isInterstitialPrepared) {
+        // Still downloading in background; let the player keep dropping blocks smoothly!
+        if (!this._isLoadingInterstitial) this.preloadInterstitial();
+        return;
+      }
+
+      // Interstitial is ready in memory. Ensure app is visible before presenting.
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
       this._isShowingPendingAd = true;
-      console.log('[AdMob] Game is active and internet turned ON with pending interstitial. Showing ad automatically...');
+      console.log('[AdMob] Game is active and ad is loaded. Presenting ad with smooth pause...');
 
       const wasPlaying = (typeof paused !== 'undefined' && !paused);
       if (wasPlaying) {
@@ -1614,7 +1633,26 @@ const AdMobManager = {
 
       this.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
 
+      // Safety timeout: if ad fails to show or hangs, automatically resume after 5s
+      const safetyResumeTimer = setTimeout(() => {
+        if (this._isShowingPendingAd) {
+          console.warn('[AdMob] Ad display safety timeout reached; resuming game');
+          this._isShowingPendingAd = false;
+          if (wasPlaying && typeof gameRunning !== 'undefined' && gameRunning) {
+            paused = false;
+            if (typeof lastDrop !== 'undefined') lastDrop = performance.now();
+            if (typeof startMusic === 'function' && typeof _musicOn !== 'undefined' && _musicOn && !_muted) {
+              startMusic();
+            }
+            if (typeof syncPauseBtn === 'function') syncPauseBtn();
+            if (typeof animFrame !== 'undefined') cancelAnimationFrame(animFrame);
+            animFrame = requestAnimationFrame(gameLoop);
+          }
+        }
+      }, 5000);
+
       this.showInterstitialAd(() => {
+        clearTimeout(safetyResumeTimer);
         this._isShowingPendingAd = false;
         if (wasPlaying && typeof gameRunning !== 'undefined' && gameRunning) {
           paused = false;
@@ -1623,6 +1661,8 @@ const AdMobManager = {
             startMusic();
           }
           if (typeof syncPauseBtn === 'function') syncPauseBtn();
+          if (typeof animFrame !== 'undefined') cancelAnimationFrame(animFrame);
+          animFrame = requestAnimationFrame(gameLoop);
         }
       });
     }
@@ -1804,71 +1844,83 @@ const AdMobManager = {
 
   async preloadRewarded() {
     if (!this.adPlugin || !this.isInitialized) return;
+    if (this.isPrepared || this._isLoadingRewarded) return;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
 
-    // 1. Try production ad unit ID first
+    this._isLoadingRewarded = true;
     try {
-      console.log('[AdMob] Preloading production ad unit:', this.rewardedAdId);
-      await this.adPlugin.prepareRewardVideoAd({
-        adId: this.rewardedAdId,
-        isTesting: false
-      });
-      this.isPrepared = true;
-      this.activeAdUnitId = this.rewardedAdId;
-      console.log('[AdMob] Production rewarded ad loaded & ready');
-      return;
-    } catch (err) {
-      console.warn('[AdMob] Production ad prepare failed, trying test ad unit fallback:', err?.message || err);
-    }
+      // 1. Try production ad unit ID first
+      try {
+        console.log('[AdMob] Preloading production ad unit:', this.rewardedAdId);
+        await this.adPlugin.prepareRewardVideoAd({
+          adId: this.rewardedAdId,
+          isTesting: false
+        });
+        this.isPrepared = true;
+        this.activeAdUnitId = this.rewardedAdId;
+        console.log('[AdMob] Production rewarded ad loaded & ready');
+        return;
+      } catch (err) {
+        console.warn('[AdMob] Production ad prepare failed, trying test ad unit fallback:', err?.message || err);
+      }
 
-    // 2. Fall back to official test ad unit
-    try {
-      console.log('[AdMob] Preloading test ad unit:', this.testRewardedAdId);
-      await this.adPlugin.prepareRewardVideoAd({
-        adId: this.testRewardedAdId,
-        isTesting: true
-      });
-      this.isPrepared = true;
-      this.activeAdUnitId = this.testRewardedAdId;
-      console.log('[AdMob] Test rewarded ad loaded & ready');
-    } catch (err2) {
-      console.warn('[AdMob] Test ad prepare also failed:', err2?.message || err2);
-      this.isPrepared = false;
+      // 2. Fall back to official test ad unit
+      try {
+        console.log('[AdMob] Preloading test ad unit:', this.testRewardedAdId);
+        await this.adPlugin.prepareRewardVideoAd({
+          adId: this.testRewardedAdId,
+          isTesting: true
+        });
+        this.isPrepared = true;
+        this.activeAdUnitId = this.testRewardedAdId;
+        console.log('[AdMob] Test rewarded ad loaded & ready');
+      } catch (err2) {
+        console.warn('[AdMob] Test ad prepare also failed:', err2?.message || err2);
+        this.isPrepared = false;
+      }
+    } finally {
+      this._isLoadingRewarded = false;
     }
   },
 
   async preloadInterstitial() {
     if (!this.adPlugin || !this.isInitialized) return;
+    if (this.isInterstitialPrepared || this._isLoadingInterstitial) return;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
 
-    // 1. Try production interstitial ID if set
-    if (this.interstitialAdId && !this.interstitialAdId.includes('YOUR_')) {
+    this._isLoadingInterstitial = true;
+    try {
+      // 1. Try production interstitial ID if set
+      if (this.interstitialAdId && !this.interstitialAdId.includes('YOUR_')) {
+        try {
+          console.log('[AdMob] Preloading production interstitial:', this.interstitialAdId);
+          await this.adPlugin.prepareInterstitial({
+            adId: this.interstitialAdId,
+            isTesting: false
+          });
+          this.isInterstitialPrepared = true;
+          console.log('[AdMob] Production interstitial ready');
+          return;
+        } catch (err) {
+          console.warn('[AdMob] Production interstitial prepare failed, trying test fallback:', err?.message || err);
+        }
+      }
+
+      // 2. Test interstitial fallback
       try {
-        console.log('[AdMob] Preloading production interstitial:', this.interstitialAdId);
+        console.log('[AdMob] Preloading test interstitial:', this.testInterstitialAdId);
         await this.adPlugin.prepareInterstitial({
-          adId: this.interstitialAdId,
-          isTesting: false
+          adId: this.testInterstitialAdId,
+          isTesting: true
         });
         this.isInterstitialPrepared = true;
-        console.log('[AdMob] Production interstitial ready');
-        return;
-      } catch (err) {
-        console.warn('[AdMob] Production interstitial prepare failed, trying test fallback:', err?.message || err);
+        console.log('[AdMob] Test interstitial loaded & ready');
+      } catch (err2) {
+        console.warn('[AdMob] Test interstitial prepare also failed:', err2?.message || err2);
+        this.isInterstitialPrepared = false;
       }
-    }
-
-    // 2. Test interstitial fallback
-    try {
-      console.log('[AdMob] Preloading test interstitial:', this.testInterstitialAdId);
-      await this.adPlugin.prepareInterstitial({
-        adId: this.testInterstitialAdId,
-        isTesting: true
-      });
-      this.isInterstitialPrepared = true;
-      console.log('[AdMob] Test interstitial loaded & ready');
-    } catch (err2) {
-      console.warn('[AdMob] Test interstitial prepare also failed:', err2?.message || err2);
-      this.isInterstitialPrepared = false;
+    } finally {
+      this._isLoadingInterstitial = false;
     }
   },
 
@@ -1909,16 +1961,15 @@ const AdMobManager = {
     localStorage.setItem(PENDING_INTERSTITIAL_KEY, 'true');
 
     if (!this.isInterstitialPrepared) {
-      console.log('[AdMob] Interstitial not ready yet, loading on-demand...');
+      console.log('[AdMob] Interstitial not ready yet, quick preload attempt...');
       await this.preloadInterstitial();
-      for (let attempt = 0; attempt < 4 && !this.isInterstitialPrepared; attempt++) {
-        await new Promise(r => setTimeout(r, 500));
-        await this.preloadInterstitial();
+      if (!this.isInterstitialPrepared) {
+        await new Promise(r => setTimeout(r, 600));
       }
     }
 
     if (!this.isInterstitialPrepared) {
-      console.warn('[AdMob] Interstitial failed to prepare or network timeout; continuing without blocking user');
+      console.warn('[AdMob] Interstitial ad not ready; continuing without blocking player');
       localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
       this._isShowingPendingAd = false;
       if (typeof this._onInterstitialClosed === 'function') {
@@ -3127,6 +3178,31 @@ window.endGame = function endGame(){
 
 // ── Pause button keyboard shortcut ─────────────
 document.addEventListener('keydown',e=>{ if(e.code==='KeyS'&&!gameRunning) openSettingsAndInit(); });
+
+// ── App Lifecycle: Resume & Frame Loop Watchdog ─────────────────────────
+// Guarantees game loop and audio never freeze when switching apps, toggling networks, or returning
+function handleAppResume() {
+  if (typeof gameRunning !== 'undefined' && gameRunning && !paused) {
+    lastDrop = performance.now();
+    if (typeof animFrame !== 'undefined') cancelAnimationFrame(animFrame);
+    animFrame = requestAnimationFrame(gameLoop);
+    try {
+      if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    } catch (_) {}
+    if (typeof _musicOn !== 'undefined' && _musicOn && !_muted && typeof startMusic === 'function') {
+      startMusic();
+    }
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    handleAppResume();
+  }
+});
+window.addEventListener('focus', handleAppResume);
+window.addEventListener('pageshow', handleAppResume);
 
 // Initial button state
 syncControlButtons();
