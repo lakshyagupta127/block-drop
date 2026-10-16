@@ -1571,6 +1571,19 @@ const AdMobManager = {
     return localStorage.getItem(PENDING_INTERSTITIAL_KEY) === 'true';
   },
 
+  _handleInterstitialDismissed() {
+    console.log('[AdMob] Interstitial dismissed. User completed ad session.');
+    localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+    this.isInterstitialPrepared = false;
+    this._isShowingPendingAd = false;
+    this.preloadInterstitial();
+    if (typeof this._onInterstitialClosed === 'function') {
+      const cb = this._onInterstitialClosed;
+      this._onInterstitialClosed = null;
+      cb();
+    }
+  },
+
   checkPendingAdOnline() {
     const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
     if (!isOnline) return;
@@ -1617,6 +1630,13 @@ const AdMobManager = {
 
   async init() {
     try {
+      // Auto-heal any stuck pending flag from prior versions if user hasn't completed 4 games
+      const currentGCount = parseInt(localStorage.getItem(INTERSTITIAL_COUNT_KEY) || '0', 10);
+      if (currentGCount < 4) {
+        localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+      }
+      this._isShowingPendingAd = false;
+
       // Allow Capacitor bridge up to 1.5 seconds to populate plugins on native launch
       for (let i = 0; i < 6; i++) {
         if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins && window.Capacitor.Plugins.AdMob) {
@@ -1705,58 +1725,67 @@ const AdMobManager = {
         }
       });
 
-      // Interstitial Listeners
-      this.adPlugin.addListener('onInterstitialAdLoaded', () => {
+      // Interstitial Listeners (binding both standard and on-prefixed event names)
+      const handleInterstitialLoaded = () => {
         console.log('[AdMob] Interstitial loaded & ready');
         this.isInterstitialPrepared = true;
-      });
-      this.adPlugin.addListener('onInterstitialAdShowed', () => {
+      };
+      this.adPlugin.addListener('interstitialAdLoaded', handleInterstitialLoaded);
+      this.adPlugin.addListener('onInterstitialAdLoaded', handleInterstitialLoaded);
+
+      const handleInterstitialShowed = () => {
         console.log('[AdMob] Interstitial showed on screen');
         // Player has entered an interstitial session; if they close the app now, flag persists
         localStorage.setItem(PENDING_INTERSTITIAL_KEY, 'true');
-      });
-      this.adPlugin.addListener('onInterstitialAdDismissed', () => {
-        console.log('[AdMob] Interstitial dismissed. User watched ad.');
-        // User watched/dismissed the ad — clear the pending requirement
-        localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
-        this.isInterstitialPrepared = false;
-        this._isShowingPendingAd = false;
-        this.preloadInterstitial();
-        if (typeof this._onInterstitialClosed === 'function') {
-          const cb = this._onInterstitialClosed;
-          this._onInterstitialClosed = null;
-          cb();
-        }
-      });
-      this.adPlugin.addListener('onInterstitialAdFailedToLoad', (err) => {
+      };
+      this.adPlugin.addListener('interstitialAdShowed', handleInterstitialShowed);
+      this.adPlugin.addListener('onInterstitialAdShowed', handleInterstitialShowed);
+
+      const handleInterstitialDismissed = () => {
+        this._handleInterstitialDismissed();
+      };
+      this.adPlugin.addListener('interstitialAdDismissed', handleInterstitialDismissed);
+      this.adPlugin.addListener('onInterstitialAdDismissed', handleInterstitialDismissed);
+
+      const handleInterstitialFailedToLoad = (err) => {
         console.warn('[AdMob] Interstitial failed to load event:', err);
         this.isInterstitialPrepared = false;
-      });
-      this.adPlugin.addListener('onInterstitialAdFailedToShow', (err) => {
+      };
+      this.adPlugin.addListener('interstitialAdFailedToLoad', handleInterstitialFailedToLoad);
+      this.adPlugin.addListener('onInterstitialAdFailedToLoad', handleInterstitialFailedToLoad);
+
+      const handleInterstitialFailedToShow = (err) => {
         console.warn('[AdMob] Interstitial failed to show event:', err);
-        // Do NOT clear PENDING_INTERSTITIAL_KEY — keep requirement for when network is ready
         this.isInterstitialPrepared = false;
         this._isShowingPendingAd = false;
+        localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
         if (typeof this._onInterstitialClosed === 'function') {
           const cb = this._onInterstitialClosed;
           this._onInterstitialClosed = null;
           cb();
         }
-      });
+      };
+      this.adPlugin.addListener('interstitialAdFailedToShow', handleInterstitialFailedToShow);
+      this.adPlugin.addListener('onInterstitialAdFailedToShow', handleInterstitialFailedToShow);
 
-      // Banner Listeners
-      this.adPlugin.addListener('onBannerAdLoaded', () => {
+      // Banner Listeners (binding both standard and on-prefixed event names)
+      const handleBannerLoaded = () => {
         console.log('[AdMob] Banner loaded successfully');
         this.isBannerShowing = true;
         document.body.classList.add('has-banner-ad');
         document.documentElement.style.setProperty('--banner-height', '52px');
-      });
-      this.adPlugin.addListener('onBannerAdFailedToLoad', (err) => {
+      };
+      this.adPlugin.addListener('bannerAdLoaded', handleBannerLoaded);
+      this.adPlugin.addListener('onBannerAdLoaded', handleBannerLoaded);
+
+      const handleBannerFailed = (err) => {
         console.warn('[AdMob] Banner failed to load:', err);
         this.isBannerShowing = false;
         document.body.classList.remove('has-banner-ad');
         document.documentElement.style.setProperty('--banner-height', '0px');
-      });
+      };
+      this.adPlugin.addListener('bannerAdFailedToLoad', handleBannerFailed);
+      this.adPlugin.addListener('onBannerAdFailedToLoad', handleBannerFailed);
 
       // Auto-trigger pending interstitial when internet is restored
       window.addEventListener('online', () => {
@@ -1889,12 +1918,38 @@ const AdMobManager = {
     }
 
     if (!this.isInterstitialPrepared) {
-      console.warn('[AdMob] Interstitial still loading or slow network; keeping pending flag for next retry');
+      console.warn('[AdMob] Interstitial failed to prepare or network timeout; continuing without blocking user');
+      localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
       this._isShowingPendingAd = false;
-      // Do NOT remove PENDING_INTERSTITIAL_KEY! Keep it active
-      if (onClosed) onClosed();
+      if (typeof this._onInterstitialClosed === 'function') {
+        const cb = this._onInterstitialClosed;
+        this._onInterstitialClosed = null;
+        cb();
+      }
       return;
     }
+
+    // Safety fallback: When the user dismisses the full-screen ad Activity and returns to the WebView,
+    // ensure dismissal cleanup executes even if native plugin event is dropped or delayed
+    const focusCleanup = () => {
+      setTimeout(() => {
+        if (this._onInterstitialClosed) {
+          console.log('[AdMob] Window focus regained after ad Activity closed; ensuring dismissal cleanup');
+          this._handleInterstitialDismissed();
+        }
+      }, 700);
+      window.removeEventListener('focus', focusCleanup);
+      document.removeEventListener('visibilitychange', visCleanup);
+    };
+    const visCleanup = () => {
+      if (document.visibilityState === 'visible') {
+        focusCleanup();
+      }
+    };
+    setTimeout(() => {
+      window.addEventListener('focus', focusCleanup, { once: true });
+      document.addEventListener('visibilitychange', visCleanup, { once: true });
+    }, 1200);
 
     try {
       await this.adPlugin.showInterstitial();
@@ -1902,8 +1957,14 @@ const AdMobManager = {
       console.warn('[AdMob] Interstitial show failed:', err);
       this.isInterstitialPrepared = false;
       this._isShowingPendingAd = false;
-      // Do NOT clear PENDING_INTERSTITIAL_KEY on transient error
-      if (onClosed) onClosed();
+      localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
+      window.removeEventListener('focus', focusCleanup);
+      document.removeEventListener('visibilitychange', visCleanup);
+      if (typeof this._onInterstitialClosed === 'function') {
+        const cb = this._onInterstitialClosed;
+        this._onInterstitialClosed = null;
+        cb();
+      }
     }
   },
 
