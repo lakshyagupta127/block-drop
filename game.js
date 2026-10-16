@@ -1522,7 +1522,7 @@ const AdMobManager = {
   pendingName: null,
 
   hasPendingInterstitial() {
-    return localStorage.getItem(PENDING_INTERSTITIAL_KEY) === 'true';
+    return false;
   },
 
   getStoredMatchesCount() {
@@ -1530,7 +1530,7 @@ const AdMobManager = {
   },
 
   isAdDue() {
-    return this.hasPendingInterstitial() || this.getStoredMatchesCount() >= INTERSTITIAL_GAME_INTERVAL;
+    return this.getStoredMatchesCount() >= INTERSTITIAL_GAME_INTERVAL;
   },
 
   resetMatchesCount() {
@@ -1553,10 +1553,7 @@ const AdMobManager = {
   },
 
   checkPendingAdOnline() {
-    const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
-    if (!isOnline) return;
-
-    // Ensure ad units are preloaded in background once online safely without duplicate calls
+    // Background preload of ads when online — NEVER interrupts active gameplay
     if (this.adPlugin && this.isInitialized) {
       if (!this.isInterstitialPrepared && !this._isLoadingInterstitial) {
         this.preloadInterstitial();
@@ -1567,81 +1564,19 @@ const AdMobManager = {
       if (!this.isAppOpenPrepared && !this._isLoadingAppOpen) {
         this.preloadAppOpen();
       }
-    }
-
-    if (!this.isAdDue()) return;
-    if (this._isShowingPendingAd) return;
-
-    // If game has started / is active and internet turned on:
-    // Only present the ad once it has fully downloaded in background AND app is visible in foreground!
-    // NEVER freeze or pause active gameplay while an ad is downloading!
-    if (typeof gameRunning !== 'undefined' && gameRunning) {
-      if (!this.isInterstitialPrepared) {
-        // Still downloading in background; let the player keep dropping blocks smoothly!
-        if (!this._isLoadingInterstitial) this.preloadInterstitial();
-        return;
-      }
-
-      // Interstitial is ready in memory. Ensure app is visible before presenting.
-      if (document.visibilityState !== 'visible') {
-        return;
-      }
-
-      this._isShowingPendingAd = true;
-      console.log('[AdMob] Game is active and ad is loaded. Presenting ad with smooth pause...');
-
-      const wasPlaying = (typeof paused !== 'undefined' && !paused);
-      if (wasPlaying) {
-        paused = true;
-        if (typeof stopMusic === 'function') stopMusic();
-        if (typeof syncPauseBtn === 'function') syncPauseBtn();
-      }
-
-      this.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
-
-      // Safety timeout: if ad fails to show or hangs, automatically resume after 5s
-      const safetyResumeTimer = setTimeout(() => {
-        if (this._isShowingPendingAd) {
-          console.warn('[AdMob] Ad display safety timeout reached; resuming game');
-          this._isShowingPendingAd = false;
-          if (wasPlaying && typeof gameRunning !== 'undefined' && gameRunning) {
-            paused = false;
-            if (typeof lastDrop !== 'undefined') lastDrop = performance.now();
-            if (typeof startMusic === 'function' && typeof _musicOn !== 'undefined' && _musicOn && !_muted) {
-              startMusic();
-            }
-            if (typeof syncPauseBtn === 'function') syncPauseBtn();
-            if (typeof animFrame !== 'undefined') cancelAnimationFrame(animFrame);
-            animFrame = requestAnimationFrame(gameLoop);
-          }
+      // If player is in menu, ensure banner is showing
+      if (typeof gameRunning === 'undefined' || !gameRunning) {
+        if (!this.isBannerShowing && !this._isBannerLoading) {
+          this.showMenuBanner();
         }
-      }, 5000);
-
-      this.showInterstitialAd(() => {
-        clearTimeout(safetyResumeTimer);
-        this._isShowingPendingAd = false;
-        this.resetMatchesCount();
-        if (wasPlaying && typeof gameRunning !== 'undefined' && gameRunning) {
-          paused = false;
-          if (typeof lastDrop !== 'undefined') lastDrop = performance.now();
-          if (typeof startMusic === 'function' && typeof _musicOn !== 'undefined' && _musicOn && !_muted) {
-            startMusic();
-          }
-          if (typeof syncPauseBtn === 'function') syncPauseBtn();
-          if (typeof animFrame !== 'undefined') cancelAnimationFrame(animFrame);
-          animFrame = requestAnimationFrame(gameLoop);
-        }
-      });
+      }
     }
   },
 
   async init() {
     try {
-      // Auto-heal any stuck pending flag from prior versions if user hasn't completed required games
-      const currentGCount = parseInt(localStorage.getItem(INTERSTITIAL_COUNT_KEY) || '0', 10);
-      if (currentGCount < INTERSTITIAL_GAME_INTERVAL) {
-        localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
-      }
+      // Auto-heal any stuck flags so offline gameplay is immediately unblocked
+      localStorage.removeItem(PENDING_INTERSTITIAL_KEY);
       localStorage.removeItem('bd_free_revives');
       this._isShowingPendingAd = false;
 
@@ -1744,8 +1679,7 @@ const AdMobManager = {
 
       const handleInterstitialShowed = () => {
         console.log('[AdMob] Interstitial showed on screen');
-        // Player has entered an interstitial session; if they close the app now, flag persists
-        localStorage.setItem(PENDING_INTERSTITIAL_KEY, 'true');
+        this.resetMatchesCount();
       };
       this.adPlugin.addListener('interstitialAdShowed', handleInterstitialShowed);
       this.adPlugin.addListener('onInterstitialAdShowed', handleInterstitialShowed);
@@ -2006,37 +1940,18 @@ const AdMobManager = {
       return;
     }
 
-    const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
-    if (!isOnline) {
-      // Offline: do NOT show alert '⚠️ NO INTERNET: CONNECT TO INTERNET TO PLAY'
-      // Keep pending flag stored so it automatically shows when internet connects
+    // If interstitial is not preloaded in memory (offline or still downloading), NEVER block the player!
+    if (!this.isInterstitialPrepared) {
+      console.log('[AdMob] Interstitial not ready in memory (offline or loading) - proceeding immediately');
       this._isShowingPendingAd = false;
       if (onClosed) onClosed();
+      // Background preload for future game transitions
+      this.preloadInterstitial().catch(() => {});
       return;
     }
 
     this._onInterstitialClosed = onClosed;
-    localStorage.setItem(PENDING_INTERSTITIAL_KEY, 'true');
-
-    if (!this.isInterstitialPrepared) {
-      console.log('[AdMob] Interstitial not ready yet, quick preload attempt...');
-      await this.preloadInterstitial();
-      if (!this.isInterstitialPrepared) {
-        await new Promise(r => setTimeout(r, 600));
-      }
-    }
-
-    if (!this.isInterstitialPrepared) {
-      console.warn('[AdMob] Interstitial ad not ready; continuing without blocking player');
-      this.resetMatchesCount();
-      this._isShowingPendingAd = false;
-      if (typeof this._onInterstitialClosed === 'function') {
-        const cb = this._onInterstitialClosed;
-        this._onInterstitialClosed = null;
-        cb();
-      }
-      return;
-    }
+    this._isShowingPendingAd = true;
 
     // Safety fallback: When the user dismisses the full-screen ad Activity and returns to the WebView,
     // ensure dismissal cleanup executes even if native plugin event is dropped or delayed
@@ -2202,11 +2117,11 @@ const AdMobManager = {
   async requestReviveWithAd() {
     if (_hasRevivedThisGame || _reviveSecondsLeft <= 0) return;
 
-    // 1. Strict check: Internet connection
+    // 1. Check: Internet connection for rewarded video ad
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      this.showNotice('⚠️ NO INTERNET', 'CONNECT TO INTERNET TO REVIVE');
+      this.showNotice('⚡ INTERNET REQUIRED', 'CONNECT TO WATCH AD & REVIVE');
       if (typeof SFX !== 'undefined' && SFX.collision) SFX.collision();
-      return; // STRICT: DO NOT REVIVE
+      return; // STRICT: DO NOT REVIVE WITHOUT AD
     }
 
     if (this.adPlugin && this.isInitialized) {
@@ -2224,7 +2139,7 @@ const AdMobManager = {
         await this.showPreparedOrLoad();
       } catch (err) {
         console.warn('[AdMob] Ad show failed:', err);
-        this.showNotice('⚠️ AD FAILED TO LOAD', 'PLEASE CHECK NETWORK & TRY AGAIN');
+        this.showNotice('⚠️ AD NOT READY', 'CHECK NETWORK OR TAP PLAY AGAIN');
         if (typeof SFX !== 'undefined' && SFX.collision) SFX.collision();
         this.pendingAction = null;
         resumeReviveCountdown();
@@ -2237,12 +2152,12 @@ const AdMobManager = {
   },
 
   async requestNameChangeUnlockWithAd() {
-    // 1. Strict check: Internet connection
+    // 1. Check: Internet connection
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      this.showNotice('⚠️ NO INTERNET', 'CONNECT TO INTERNET TO CHANGE NAME');
+      this.showNotice('⚡ INTERNET REQUIRED', 'CONNECT TO WATCH AD & CHANGE NAME');
       if (typeof SFX !== 'undefined' && SFX.collision) SFX.collision();
       const msgEl = document.getElementById('settingsMsg');
-      if (msgEl) { msgEl.textContent = '⚠️ Connect to internet to change name.'; msgEl.className = 'settings-msg error'; }
+      if (msgEl) { msgEl.textContent = '⚡ Connect to internet to change name.'; msgEl.className = 'settings-msg error'; }
       return; // STRICT: DO NOT UNLOCK
     }
 
@@ -2384,78 +2299,46 @@ function fxReviveClear(topRows) {
 
 // ── Interstitial Triggers & Frequency Capping ────────────────────────
 function shouldTriggerGameOverInterstitial() {
-  return AdMobManager.isAdDue();
+  return AdMobManager.isAdDue() && AdMobManager.isInterstitialPrepared;
 }
 
 function handlePlayAgainClick() {
-  const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
-
-  if (AdMobManager.isAdDue()) {
-    if (isOnline) {
-      AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
-      AdMobManager.showInterstitialAd(() => {
-        AdMobManager.resetMatchesCount();
-        startGame();
-      });
-      return;
-    } else {
-      // Offline: do not show alert. Allow playing locally; matches will accumulate locally
-      console.log('[AdMob] Offline: playing locally without ad, matches will accumulate');
+  // If an interstitial is due (every 7 games) AND is already preloaded in memory:
+  if (shouldTriggerGameOverInterstitial()) {
+    AdMobManager.showInterstitialAd(() => {
+      AdMobManager.resetMatchesCount();
       startGame();
-      return;
-    }
+    });
+    return;
   }
 
+  // Offline, ad still loading, or not due yet: start game instantly with ZERO delay!
   startGame();
 }
 
 function handleGoMenuClick() {
-  const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
-
-  if (AdMobManager.isAdDue()) {
-    if (isOnline) {
-      AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
-      AdMobManager.showInterstitialAd(() => {
-        AdMobManager.resetMatchesCount();
-        returnToMenu();
-      });
-      return;
-    } else {
-      // Offline: allow returning to menu, matches remain stored locally
+  // If an interstitial is due (every 7 games) AND is already preloaded in memory:
+  if (shouldTriggerGameOverInterstitial()) {
+    AdMobManager.showInterstitialAd(() => {
+      AdMobManager.resetMatchesCount();
       returnToMenu();
-      return;
-    }
+    });
+    return;
   }
 
+  // Offline, ad still loading, or not due yet: return to menu instantly!
   returnToMenu();
 }
 
 // ── Game flow ──────────────────────────────────
 async function startGame() {
-  const isOnline = (typeof navigator === 'undefined' || navigator.onLine !== false);
-
-  // Check if player has an ad due (pending ad or accumulated games >= 4)
-  if (AdMobManager.isAdDue()) {
-    if (isOnline) {
-      AdMobManager.showNotice('🎬 AD IN PROGRESS', 'PLEASE COMPLETE AD TO PLAY');
-      AdMobManager.showInterstitialAd(() => {
-        AdMobManager.resetMatchesCount();
-        startGame();
-      });
-      return;
-    } else {
-      // Offline: do not show alerts. Allow local gameplay immediately!
-      console.log('[AdMob] Offline: starting local game; matches will accumulate locally');
-    }
-  }
+  // Hide banner during active gameplay
+  AdMobManager.hideBannerForGame();
 
   // Record this match locally in localStorage
   const currentMatches = AdMobManager.getStoredMatchesCount() + 1;
   localStorage.setItem(INTERSTITIAL_COUNT_KEY, currentMatches.toString());
   console.log(`[AdMob] Started match #${currentMatches} (stored locally)`);
-
-  // Hide banner during active gameplay
-  AdMobManager.hideBannerForGame();
 
   document.body.classList.remove('in-menu');
   try{ if(audioCtx&&audioCtx.state==='suspended') audioCtx.resume(); }catch(_){}
@@ -2470,7 +2353,11 @@ async function startGame() {
   cancelAnimationFrame(animFrame);
   animFrame=requestAnimationFrame(gameLoop);
   syncControlButtons();
-  await fetchGameToken();
+
+  // Non-blocking background token fetch (only succeeds when online)
+  if (typeof fetchGameToken === 'function') {
+    fetchGameToken().catch(() => {});
+  }
 }
 
 function endGame() {
@@ -2646,7 +2533,11 @@ function closeLB() {
 }
 
 // ── Auto score save (no name prompt — name already set in onboarding) ──
-async function autoSaveScore() {
+function autoSaveScore() {
+  // Always update personal best locally first
+  _personalBest = Math.max(_personalBest, score);
+  try { localStorage.setItem('bd_best_score', _personalBest); } catch(_) {}
+
   // Use the player's saved name — fall back to 'Player' only if truly unset
   const name = (_playerName && _playerName !== 'Player') ? _playerName : null;
 
@@ -2656,17 +2547,18 @@ async function autoSaveScore() {
     return;
   }
 
-  // Save silently in background — show game over screen immediately
-  const result = await apiSaveScore(name, score, level, lines);
-  if (!result.success) console.warn('Score save failed:', result.error);
-  if (result.bestScore) _personalBest = Math.max(_personalBest, result.bestScore);
-  else _personalBest = Math.max(_personalBest, score);
-  showGameOverOverlay(result.rank || null, result.bestScore || _personalBest);
+  // Show Game Over screen IMMEDIATELY with zero network latency
+  showGameOverOverlay(null, _personalBest);
 
-  // If internet is connected and score places on Top 500 Leaderboard, congratulate!
-  if (result.success && result.rank && result.rank <= 500) {
-    showLeaderboardCongrats(result.rank, score);
-  }
+  // Background score sync (non-blocking, only succeeds if online)
+  apiSaveScore(name, score, level, lines).then(result => {
+    if (result && result.bestScore) {
+      _personalBest = Math.max(_personalBest, result.bestScore);
+    }
+    if (result && result.success && result.rank && result.rank <= 500) {
+      showLeaderboardCongrats(result.rank, score);
+    }
+  }).catch(() => {});
 }
 
 // ── Name entry (fallback only — for players with no saved name) ────────
@@ -2680,25 +2572,27 @@ function showNameEntry() {
   setTimeout(() => document.getElementById('nameInput')?.focus(), 100);
 }
 
-async function saveScore() {
+function saveScore() {
   const name = document.getElementById('nameInput').value.trim() || 'Player';
   if (name !== 'Player') {
     _playerName = name;
     localStorage.setItem(PLAYER_NAME_KEY, _playerName);
   }
-  const btn  = document.getElementById('saveScoreBtn');
-  btn.disabled = true; btn.textContent = '💾 Saving…';
-  const result = await apiSaveScore(name, score, level, lines);
   document.getElementById('nameModal').style.display = 'none';
-  SFX.click(); btn.disabled = false; btn.textContent = '💾 Save';
-  if (!result.success) console.warn('Score save failed:', result.error);
-  if (result.bestScore) _personalBest = Math.max(_personalBest, result.bestScore);
-  else _personalBest = Math.max(_personalBest, score);
-  showGameOverOverlay(result.rank || null, result.bestScore || _personalBest);
+  SFX.click();
 
-  if (result.success && result.rank && result.rank <= 500) {
-    showLeaderboardCongrats(result.rank, score);
-  }
+  _personalBest = Math.max(_personalBest, score);
+  try { localStorage.setItem('bd_best_score', _personalBest); } catch(_) {}
+  showGameOverOverlay(null, _personalBest);
+
+  apiSaveScore(name, score, level, lines).then(result => {
+    if (result && result.bestScore) {
+      _personalBest = Math.max(_personalBest, result.bestScore);
+    }
+    if (result && result.success && result.rank && result.rank <= 500) {
+      showLeaderboardCongrats(result.rank, score);
+    }
+  }).catch(() => {});
 }
 
 function skipScore() {
@@ -3684,9 +3578,8 @@ document.addEventListener('keydown', e => {
   inp.addEventListener('focus',  validate);
 })();
 
-async function submitOnboardName(){
+function submitOnboardName(){
   const inp   = document.getElementById('onboardNameInput');
-  const btn   = document.getElementById('onboardNameNextBtn');
   const msgEl = document.getElementById('onboardNameMsg');
   const name  = (inp?.value||'').trim();
 
@@ -3695,33 +3588,23 @@ async function submitOnboardName(){
     inp?.focus(); return;
   }
 
-  btn.disabled=true; btn.textContent='⏳ Saving…';
+  // Always save locally immediately so onboarding works 100% offline with zero delay
+  _playerName = name;
+  localStorage.setItem(PLAYER_NAME_KEY, _playerName);
+  updatePlayerUI();
 
+  // Background server sync if fingerprint is available (non-blocking)
   if(_playerFp){
-    try{
-      const res  = await apiFetch('/api/player/name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fp:_playerFp,name})}, 6000);
-      const data = await res.json();
-      if(data.success){
-        _playerName=data.name; _canChangeName=data.canChangeName; _nextChangeAt=data.nextChangeAt;
-        localStorage.setItem(PLAYER_NAME_KEY, _playerName);
-        updatePlayerUI();
-      } else if(msgEl){
-        msgEl.textContent=data.error||'Could not save name.'; msgEl.className='onboard-name-msg error';
-        btn.disabled=false; btn.textContent='Save Name & Continue →'; return;
-      }
-    } catch(err){
-      // Network error — save name locally and continue
-      _playerName = name;
-      localStorage.setItem(PLAYER_NAME_KEY, _playerName);
-      updatePlayerUI();
-    }
-  } else {
-    _playerName = name;
-    localStorage.setItem(PLAYER_NAME_KEY, _playerName);
-    updatePlayerUI();
+    apiFetch('/api/player/name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fp:_playerFp,name})}, 4000)
+      .then(r=>r.json()).then(data=>{
+        if(data && data.success){
+          _playerName=data.name; _canChangeName=data.canChangeName; _nextChangeAt=data.nextChangeAt;
+          localStorage.setItem(PLAYER_NAME_KEY, _playerName);
+          updatePlayerUI();
+        }
+      }).catch(()=>{});
   }
 
-  btn.textContent='Save Name & Continue →';
   showOnboardCountries();
 }
 
