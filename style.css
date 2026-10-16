@@ -127,25 +127,23 @@ body.in-menu .right-panel {
 body.in-menu .game-wrapper {
   height: 100vh;
   align-items: center;
-  padding: 0 0 calc(62px + var(--banner-height, 0px)) 0 !important;
+  padding: 0 0 62px 0 !important;
   box-sizing: border-box;
-  transition: padding-bottom 0.2s ease;
 }
 
 body.in-menu.has-banner-ad .game-wrapper {
-  padding: 0 0 118px 0 !important;
+  padding: 0 0 calc(62px + var(--banner-height, 52px)) 0 !important;
 }
 
 body.in-menu #gameCanvas {
   width: 92vw !important;
   max-width: 340px !important;
-  max-height: calc(92vh - 65px - var(--banner-height, 0px)) !important;
+  max-height: calc(92vh - 65px) !important;
   aspect-ratio: 1 / 2.16 !important;
-  transition: max-height 0.2s ease;
 }
 
 body.in-menu.has-banner-ad #gameCanvas {
-  max-height: calc(88vh - 120px) !important;
+  max-height: calc(92vh - 65px - var(--banner-height, 52px)) !important;
 }
 
 .stat-pill {

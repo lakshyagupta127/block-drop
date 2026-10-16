@@ -1491,6 +1491,7 @@ const AdMobManager = {
   bannerAdId: 'ca-app-pub-8122097857797560/1394716914',
   testBannerAdId: 'ca-app-pub-3940256099942544/6300978111',
   isBannerShowing: false,
+  _isBannerLoading: false,
 
   // Full-Screen Interstitial Ad Unit IDs
   interstitialAdId: 'ca-app-pub-8122097857797560/8829600946',
@@ -1565,9 +1566,6 @@ const AdMobManager = {
       }
       if (!this.isAppOpenPrepared && !this._isLoadingAppOpen) {
         this.preloadAppOpen();
-      }
-      if (!this.isBannerShowing && (typeof gameRunning === 'undefined' || !gameRunning || paused)) {
-        this.showMenuBanner();
       }
     }
 
@@ -1783,6 +1781,7 @@ const AdMobManager = {
       const handleBannerLoaded = () => {
         console.log('[AdMob] Banner loaded successfully');
         this.isBannerShowing = true;
+        this._isBannerLoading = false;
         document.body.classList.add('has-banner-ad');
         document.documentElement.style.setProperty('--banner-height', '52px');
       };
@@ -1792,6 +1791,7 @@ const AdMobManager = {
       const handleBannerFailed = (err) => {
         console.warn('[AdMob] Banner failed to load:', err);
         this.isBannerShowing = false;
+        this._isBannerLoading = false;
         document.body.classList.remove('has-banner-ad');
         document.documentElement.style.setProperty('--banner-height', '0px');
       };
@@ -2149,11 +2149,9 @@ const AdMobManager = {
     if (!this.adPlugin || !this.isInitialized) return;
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
     if (typeof gameRunning !== 'undefined' && gameRunning) return;
-    if (this.isBannerShowing) return;
+    if (this.isBannerShowing || this._isBannerLoading) return;
 
-    // Immediately allocate space so menu bar sits cleanly above the banner
-    document.body.classList.add('has-banner-ad');
-    document.documentElement.style.setProperty('--banner-height', '52px');
+    this._isBannerLoading = true;
 
     // 1. Try production banner ID if provided
     const prodBanner = (this.bannerAdId && !this.bannerAdId.includes('YOUR_')) ? this.bannerAdId : null;
@@ -2167,7 +2165,6 @@ const AdMobManager = {
           margin: 0,
           isTesting: false
         });
-        this.isBannerShowing = true;
         return;
       } catch (err) {
         console.warn('[AdMob] Prod banner show failed, trying test banner:', err?.message || err);
@@ -2184,12 +2181,10 @@ const AdMobManager = {
         margin: 0,
         isTesting: true
       });
-      this.isBannerShowing = true;
     } catch (err2) {
       console.warn('[AdMob] Test banner show failed:', err2?.message || err2);
       this.isBannerShowing = false;
-      document.body.classList.remove('has-banner-ad');
-      document.documentElement.style.setProperty('--banner-height', '0px');
+      this._isBannerLoading = false;
     }
   },
 
