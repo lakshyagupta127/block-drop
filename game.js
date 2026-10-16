@@ -1487,7 +1487,7 @@ const AdMobManager = {
   testRewardedAdId: 'ca-app-pub-3940256099942544/5224354917',
 
   // Adaptive Banner Ad Unit IDs
-  bannerAdId: 'ca-app-pub-8122097857797560/YOUR_BANNER_ID',
+  bannerAdId: 'ca-app-pub-8122097857797560/1394716914',
   testBannerAdId: 'ca-app-pub-3940256099942544/6300978111',
   isBannerShowing: false,
 
