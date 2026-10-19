@@ -1505,13 +1505,15 @@ const AdMobManager = {
 
   // App Open Ad Unit IDs
   appOpenAdId: 'ca-app-pub-8122097857797560/8257754141',
-  testAppOpenAdId: 'ca-app-pub-3940256099942544/9257390308',
+  testAppOpenAdId: 'ca-app-pub-3940256099942544/9257395921',
   isAppOpenPrepared: false,
   _isLoadingAppOpen: false,
   _isShowingAppOpen: false,
   _onAppOpenClosed: null,
   _lastAppOpenShownTs: 0,
   _appOpenColdStartShown: false,
+  activeAppOpenAdId: null,
+  _hasTriedTestBannerFallback: false,
 
   isInitialized: false,
   isPrepared: false,
@@ -1722,12 +1724,32 @@ const AdMobManager = {
       this.adPlugin.addListener('bannerAdLoaded', handleBannerLoaded);
       this.adPlugin.addListener('onBannerAdLoaded', handleBannerLoaded);
 
-      const handleBannerFailed = (err) => {
+      const handleBannerFailed = async (err) => {
         console.warn('[AdMob] Banner failed to load:', err);
         this.isBannerShowing = false;
         this._isBannerLoading = false;
         document.body.classList.remove('has-banner-ad');
         document.documentElement.style.setProperty('--banner-height', '0px');
+
+        // Automatic fallback: If production banner fails (e.g. Error 3 No Fill during review or before Google Play publish),
+        // seamlessly fall back to Google's official test banner so ads display reliably
+        if (!this._hasTriedTestBannerFallback && this.testBannerAdId && this.adPlugin) {
+          this._hasTriedTestBannerFallback = true;
+          this._isBannerLoading = true;
+          console.log('[AdMob] Production banner no fill. Loading Google test banner fallback...');
+          try {
+            await this.adPlugin.showBanner({
+              adId: this.testBannerAdId,
+              adSize: 'ADAPTIVE_BANNER',
+              position: 'BOTTOM_CENTER',
+              margin: 0,
+              isTesting: true
+            });
+          } catch (fallbackErr) {
+            console.warn('[AdMob] Test banner fallback also failed:', fallbackErr);
+            this._isBannerLoading = false;
+          }
+        }
       };
       this.adPlugin.addListener('bannerAdFailedToLoad', handleBannerFailed);
       this.adPlugin.addListener('onBannerAdFailedToLoad', handleBannerFailed);
@@ -1894,7 +1916,16 @@ const AdMobManager = {
           console.log('[AdMob] Preloading production App Open ad:', this.appOpenAdId);
           await this.adPlugin.loadAppOpen({ adId: this.appOpenAdId });
           this.isAppOpenPrepared = true;
+          this.activeAppOpenAdId = this.appOpenAdId;
           console.log('[AdMob] Production App Open ad loaded & ready');
+          if (!this._appOpenColdStartShown && (typeof gameRunning === 'undefined' || !gameRunning)) {
+            this._appOpenColdStartShown = true;
+            setTimeout(() => {
+              if (typeof gameRunning === 'undefined' || !gameRunning) {
+                this.showAppOpenAd();
+              }
+            }, 600);
+          }
           return;
         } catch (err) {
           console.warn('[AdMob] Production App Open prepare failed, trying test fallback:', err?.message || err);
@@ -1906,7 +1937,16 @@ const AdMobManager = {
         console.log('[AdMob] Preloading test App Open ad:', this.testAppOpenAdId);
         await this.adPlugin.loadAppOpen({ adId: this.testAppOpenAdId });
         this.isAppOpenPrepared = true;
+        this.activeAppOpenAdId = this.testAppOpenAdId;
         console.log('[AdMob] Test App Open ad loaded & ready');
+        if (!this._appOpenColdStartShown && (typeof gameRunning === 'undefined' || !gameRunning)) {
+          this._appOpenColdStartShown = true;
+          setTimeout(() => {
+            if (typeof gameRunning === 'undefined' || !gameRunning) {
+              this.showAppOpenAd();
+            }
+          }, 600);
+        }
       } catch (err2) {
         console.warn('[AdMob] Test App Open prepare failed:', err2?.message || err2);
         this.isAppOpenPrepared = false;
@@ -2029,7 +2069,7 @@ const AdMobManager = {
     this._onAppOpenClosed = onClosed;
 
     try {
-      await this.adPlugin.showAppOpen();
+      await this.adPlugin.showAppOpen({ adId: this.activeAppOpenAdId || this.testAppOpenAdId });
     } catch (err) {
       console.warn('[AdMob] showAppOpen failed:', err);
       this.isAppOpenPrepared = false;
@@ -2039,6 +2079,7 @@ const AdMobManager = {
         this._onAppOpenClosed = null;
         cb();
       }
+      this.preloadAppOpen();
     }
   },
 
@@ -2067,6 +2108,36 @@ const AdMobManager = {
     if (this.isBannerShowing || this._isBannerLoading) return;
 
     this._isBannerLoading = true;
+
+    // Try resuming existing banner first if one was hidden for active gameplay
+    try {
+      await this.adPlugin.resumeBanner();
+      this.isBannerShowing = true;
+      this._isBannerLoading = false;
+      document.body.classList.add('has-banner-ad');
+      document.documentElement.style.setProperty('--banner-height', '52px');
+      return;
+    } catch (_) {}
+
+    // If production banner already failed/unfilled in this session, keep using working test banner
+    if (this._hasTriedTestBannerFallback && this.testBannerAdId) {
+      try {
+        console.log('[AdMob] Showing test adaptive banner:', this.testBannerAdId);
+        await this.adPlugin.showBanner({
+          adId: this.testBannerAdId,
+          adSize: 'ADAPTIVE_BANNER',
+          position: 'BOTTOM_CENTER',
+          margin: 0,
+          isTesting: true
+        });
+        return;
+      } catch (err) {
+        console.warn('[AdMob] Test banner show failed:', err);
+        this.isBannerShowing = false;
+        this._isBannerLoading = false;
+        return;
+      }
+    }
 
     // 1. Try production banner ID if provided
     const prodBanner = (this.bannerAdId && !this.bannerAdId.includes('YOUR_')) ? this.bannerAdId : null;
