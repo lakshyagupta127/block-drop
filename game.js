@@ -1385,6 +1385,11 @@ function expireRevive() {
 function resumeReviveCountdown() {
   if (_hasRevivedThisGame || _reviveSecondsLeft <= 0) return;
   updateReviveButtonUI('active');
+  const overlayBtn = document.getElementById('overlayReviveBtn');
+  if (overlayBtn) {
+    overlayBtn.disabled = false;
+    overlayBtn.innerHTML = `⚡ REVIVE (<span id="overlayReviveTimer">${_reviveSecondsLeft}</span>s)`;
+  }
   const timerSpan = document.getElementById('overlayReviveTimer');
   if (timerSpan) timerSpan.textContent = _reviveSecondsLeft;
   if (_reviveInterval) clearInterval(_reviveInterval);
@@ -1514,6 +1519,10 @@ const AdMobManager = {
   _appOpenColdStartShown: false,
   activeAppOpenAdId: null,
   _hasTriedTestBannerFallback: false,
+  _bannerCreated: false,
+  _bannerHidden: false,
+  _rewardedLoadPromise: null,
+  _hasTriedTestRewardedFallback: false,
 
   isInitialized: false,
   isPrepared: false,
@@ -1728,6 +1737,8 @@ const AdMobManager = {
         console.warn('[AdMob] Banner failed to load:', err);
         this.isBannerShowing = false;
         this._isBannerLoading = false;
+        this._bannerCreated = false;
+        this._bannerHidden = false;
         document.body.classList.remove('has-banner-ad');
         document.documentElement.style.setProperty('--banner-height', '0px');
 
@@ -1745,6 +1756,8 @@ const AdMobManager = {
               margin: 0,
               isTesting: true
             });
+            this._bannerCreated = true;
+            this._bannerHidden = false;
           } catch (fallbackErr) {
             console.warn('[AdMob] Test banner fallback also failed:', fallbackErr);
             this._isBannerLoading = false;
@@ -1821,45 +1834,73 @@ const AdMobManager = {
     } catch (_) {}
   },
 
-  async preloadRewarded() {
-    if (!this.adPlugin || !this.isInitialized) return;
-    if (this.isPrepared || this._isLoadingRewarded) return;
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  preloadRewarded() {
+    if (!this.adPlugin || !this.isInitialized) return Promise.resolve(false);
+    if (this.isPrepared) return Promise.resolve(true);
+    if (this._rewardedLoadPromise) return this._rewardedLoadPromise;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return Promise.resolve(false);
 
     this._isLoadingRewarded = true;
-    try {
-      // 1. Try production ad unit ID first
+    this._rewardedLoadPromise = (async () => {
       try {
-        console.log('[AdMob] Preloading production ad unit:', this.rewardedAdId);
-        await this.adPlugin.prepareRewardVideoAd({
-          adId: this.rewardedAdId,
-          isTesting: false
-        });
-        this.isPrepared = true;
-        this.activeAdUnitId = this.rewardedAdId;
-        console.log('[AdMob] Production rewarded ad loaded & ready');
-        return;
-      } catch (err) {
-        console.warn('[AdMob] Production ad prepare failed, trying test ad unit fallback:', err?.message || err);
-      }
+        // If production already failed in this session, use test ad directly
+        if (this._hasTriedTestRewardedFallback && this.testRewardedAdId) {
+          try {
+            console.log('[AdMob] Preloading test rewarded ad:', this.testRewardedAdId);
+            await this.adPlugin.prepareRewardVideoAd({
+              adId: this.testRewardedAdId,
+              isTesting: true
+            });
+            this.isPrepared = true;
+            this.activeAdUnitId = this.testRewardedAdId;
+            console.log('[AdMob] Test rewarded ad loaded & ready');
+            return true;
+          } catch (err) {
+            console.warn('[AdMob] Test rewarded ad prepare failed:', err);
+            this.isPrepared = false;
+            return false;
+          }
+        }
 
-      // 2. Fall back to official test ad unit
-      try {
-        console.log('[AdMob] Preloading test ad unit:', this.testRewardedAdId);
-        await this.adPlugin.prepareRewardVideoAd({
-          adId: this.testRewardedAdId,
-          isTesting: true
-        });
-        this.isPrepared = true;
-        this.activeAdUnitId = this.testRewardedAdId;
-        console.log('[AdMob] Test rewarded ad loaded & ready');
-      } catch (err2) {
-        console.warn('[AdMob] Test ad prepare also failed:', err2?.message || err2);
-        this.isPrepared = false;
+        // 1. Try production ad unit ID first
+        try {
+          console.log('[AdMob] Preloading production ad unit:', this.rewardedAdId);
+          await this.adPlugin.prepareRewardVideoAd({
+            adId: this.rewardedAdId,
+            isTesting: false
+          });
+          this.isPrepared = true;
+          this.activeAdUnitId = this.rewardedAdId;
+          console.log('[AdMob] Production rewarded ad loaded & ready');
+          return true;
+        } catch (err) {
+          console.warn('[AdMob] Production ad prepare failed, trying test ad unit fallback:', err?.message || err);
+          this._hasTriedTestRewardedFallback = true;
+        }
+
+        // 2. Fall back to official test ad unit
+        try {
+          console.log('[AdMob] Preloading test ad unit:', this.testRewardedAdId);
+          await this.adPlugin.prepareRewardVideoAd({
+            adId: this.testRewardedAdId,
+            isTesting: true
+          });
+          this.isPrepared = true;
+          this.activeAdUnitId = this.testRewardedAdId;
+          console.log('[AdMob] Test rewarded ad loaded & ready');
+          return true;
+        } catch (err2) {
+          console.warn('[AdMob] Test ad prepare also failed:', err2?.message || err2);
+          this.isPrepared = false;
+          return false;
+        }
+      } finally {
+        this._isLoadingRewarded = false;
+        this._rewardedLoadPromise = null;
       }
-    } finally {
-      this._isLoadingRewarded = false;
-    }
+    })();
+
+    return this._rewardedLoadPromise;
   },
 
   async preloadInterstitial() {
@@ -1968,7 +2009,7 @@ const AdMobManager = {
       throw new Error('Ad could not be loaded');
     }
 
-    await this.adPlugin.showRewardVideoAd();
+    await this.adPlugin.showRewardVideoAd({ adId: this.activeAdUnitId || this.testRewardedAdId });
   },
 
   async showInterstitialAd(onClosed) {
@@ -2107,17 +2148,26 @@ const AdMobManager = {
     if (typeof gameRunning !== 'undefined' && gameRunning) return;
     if (this.isBannerShowing || this._isBannerLoading) return;
 
-    this._isBannerLoading = true;
+    // If banner was already created and just hidden during active gameplay, resume it!
+    if (this._bannerCreated && this._bannerHidden) {
+      this._isBannerLoading = true;
+      try {
+        await this.adPlugin.resumeBanner();
+        this._bannerHidden = false;
+        this.isBannerShowing = true;
+        this._isBannerLoading = false;
+        document.body.classList.add('has-banner-ad');
+        document.documentElement.style.setProperty('--banner-height', '52px');
+        console.log('[AdMob] Banner resumed on menu/gameover');
+        return;
+      } catch (err) {
+        console.warn('[AdMob] Failed to resume banner, will recreate view:', err);
+        this._bannerCreated = false;
+        this._bannerHidden = false;
+      }
+    }
 
-    // Try resuming existing banner first if one was hidden for active gameplay
-    try {
-      await this.adPlugin.resumeBanner();
-      this.isBannerShowing = true;
-      this._isBannerLoading = false;
-      document.body.classList.add('has-banner-ad');
-      document.documentElement.style.setProperty('--banner-height', '52px');
-      return;
-    } catch (_) {}
+    this._isBannerLoading = true;
 
     // If production banner already failed/unfilled in this session, keep using working test banner
     if (this._hasTriedTestBannerFallback && this.testBannerAdId) {
@@ -2130,6 +2180,8 @@ const AdMobManager = {
           margin: 0,
           isTesting: true
         });
+        this._bannerCreated = true;
+        this._bannerHidden = false;
         return;
       } catch (err) {
         console.warn('[AdMob] Test banner show failed:', err);
@@ -2151,6 +2203,8 @@ const AdMobManager = {
           margin: 0,
           isTesting: false
         });
+        this._bannerCreated = true;
+        this._bannerHidden = false;
         return;
       } catch (err) {
         console.warn('[AdMob] Prod banner show failed, trying test banner:', err?.message || err);
@@ -2167,10 +2221,13 @@ const AdMobManager = {
         margin: 0,
         isTesting: true
       });
+      this._bannerCreated = true;
+      this._bannerHidden = false;
     } catch (err2) {
       console.warn('[AdMob] Test banner show failed:', err2?.message || err2);
       this.isBannerShowing = false;
       this._isBannerLoading = false;
+      this._bannerCreated = false;
     }
   },
 
@@ -2178,9 +2235,10 @@ const AdMobManager = {
     this.isBannerShowing = false;
     document.body.classList.remove('has-banner-ad');
     document.documentElement.style.setProperty('--banner-height', '0px');
-    if (!this.adPlugin) return;
+    if (!this.adPlugin || !this._bannerCreated) return;
     try {
       await this.adPlugin.hideBanner();
+      this._bannerHidden = true;
       console.log('[AdMob] Banner hidden for active gameplay');
     } catch (_) {}
   },
@@ -2188,10 +2246,42 @@ const AdMobManager = {
   async requestReviveWithAd() {
     if (_hasRevivedThisGame || _reviveSecondsLeft <= 0) return;
 
-    // 1. Check: Internet connection for rewarded video ad
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-      this.showNotice('⚡ INTERNET REQUIRED', 'CONNECT TO WATCH AD & REVIVE');
+    // 1. Pause countdown immediately so player doesn't run out of time while ad loads
+    if (_reviveInterval) {
+      clearInterval(_reviveInterval);
+      _reviveInterval = null;
+    }
+
+    // 2. Immediate visual feedback on buttons
+    const overlayBtn = document.getElementById('overlayReviveBtn');
+    const reviveBtn = document.getElementById('reviveBtn');
+    if (overlayBtn) {
+      overlayBtn.disabled = true;
+      overlayBtn.innerHTML = '⏳ LOADING AD...';
+    }
+    if (reviveBtn) {
+      reviveBtn.disabled = true;
+      const lbl = document.getElementById('reviveLabel');
+      if (lbl) lbl.textContent = 'LOADING AD...';
+    }
+
+    // 3. Check / wait for internet connection (gives Android time to handshake if Wi-Fi was just turned on)
+    let isConnected = (typeof navigator === 'undefined' || navigator.onLine !== false);
+    if (!isConnected) {
+      this.showNotice('⏳ CONNECTING...', 'WAITING FOR NETWORK...');
+      for (let i = 0; i < 8; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        if (typeof navigator === 'undefined' || navigator.onLine !== false) {
+          isConnected = true;
+          break;
+        }
+      }
+    }
+
+    if (!isConnected) {
+      this.showNotice('⚡ INTERNET REQUIRED', 'CONNECT TO INTERNET & TAP REVIVE');
       if (typeof SFX !== 'undefined' && SFX.collision) SFX.collision();
+      resumeReviveCountdown();
       return; // STRICT: DO NOT REVIVE WITHOUT AD
     }
 
@@ -2200,24 +2290,19 @@ const AdMobManager = {
       this.pendingAction = 'revive';
       this.pendingName = null;
 
-      // Pause countdown while ad is displayed
-      if (_reviveInterval) {
-        clearInterval(_reviveInterval);
-        _reviveInterval = null;
-      }
-
       try {
+        this.showNotice('🎬 PREPARING AD', 'GET READY TO REVIVE!');
         await this.showPreparedOrLoad();
       } catch (err) {
         console.warn('[AdMob] Ad show failed:', err);
-        this.showNotice('⚠️ AD NOT READY', 'CHECK NETWORK OR TAP PLAY AGAIN');
+        this.showNotice('⚠️ AD FAILED TO LOAD', 'CHECK NETWORK OR TAP PLAY AGAIN');
         if (typeof SFX !== 'undefined' && SFX.collision) SFX.collision();
         this.pendingAction = null;
         resumeReviveCountdown();
         return; // STRICT: DO NOT REVIVE
       }
     } else {
-      // In web browser: if offline, already blocked above. If online, allow direct revive
+      // In web browser (non-Capacitor): allow direct revive
       triggerRevive();
     }
   },
